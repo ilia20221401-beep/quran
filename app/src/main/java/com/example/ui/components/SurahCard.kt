@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -53,9 +55,12 @@ fun SurahCard(
     isPlaying: Boolean,
     isBuffering: Boolean,
     isFavorite: Boolean,
+    isCached: Boolean = false,
+    downloadProgress: Float? = null,
     onPlayClick: () -> Unit,
     onReadClick: () -> Unit,
     onFavoriteClick: () -> Unit,
+    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val cardBg = if (isCurrentPlaying) {
@@ -160,7 +165,7 @@ fun SurahCard(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Tags: Revelation (مکی / مدنی), Ayahs count, Juz
+                // Tags: Revelation (مکی / مدنی), Ayahs count, Juz, and Offline Badge
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -207,19 +212,77 @@ fun SurahCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
+
+                    // Offline badge if cached
+                    if (isCached) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "آفلاین",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "آفلاین",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 10.sp
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            // Action Buttons: Play/Pause Audio & Bookmark
+            // Action Buttons: Download, Bookmark, Play/Pause Audio
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Download button if not cached or progress indicator if downloading
+                if (downloadProgress != null) {
+                    Box(
+                        modifier = Modifier.size(36.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else if (!isCached) {
+                    IconButton(
+                        onClick = onDownloadClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("download_surah_${surah.number}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "ذخیره جهت گوش دادن آفلاین",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
+
                 IconButton(
                     onClick = onFavoriteClick,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(36.dp)
                         .testTag("bookmark_surah_${surah.number}")
                 ) {
                     Icon(

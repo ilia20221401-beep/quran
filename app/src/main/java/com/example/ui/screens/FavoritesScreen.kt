@@ -42,9 +42,12 @@ import com.example.ui.components.SurahCard
 fun FavoritesScreen(
     favoriteIds: Set<Int>,
     playerState: AudioPlayerState,
+    cachedSurahNumbers: Set<Int> = emptySet(),
+    downloadProgress: Map<Int, Float> = emptyMap(),
     onSurahClick: (Surah) -> Unit,
     onPlaySurah: (Surah) -> Unit,
     onToggleFavorite: (Int) -> Unit,
+    onDownloadSurah: (Surah) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -134,9 +137,12 @@ fun FavoritesScreen(
                     isPlaying = isCurrent && playerState.isPlaying,
                     isBuffering = isCurrent && playerState.isBuffering,
                     isFavorite = true,
+                    isCached = cachedSurahNumbers.contains(surah.number),
+                    downloadProgress = downloadProgress[surah.number],
                     onPlayClick = { onPlaySurah(surah) },
                     onReadClick = { onSurahClick(surah) },
                     onFavoriteClick = { onToggleFavorite(surah.number) },
+                    onDownloadClick = { onDownloadSurah(surah) },
                     modifier = Modifier.padding(vertical = 5.dp)
                 )
             }
@@ -178,9 +184,12 @@ fun FavoritesScreen(
                 isPlaying = isCurrent && playerState.isPlaying,
                 isBuffering = isCurrent && playerState.isBuffering,
                 isFavorite = isFav,
+                isCached = cachedSurahNumbers.contains(surah.number),
+                downloadProgress = downloadProgress[surah.number],
                 onPlayClick = { onPlaySurah(surah) },
                 onReadClick = { onSurahClick(surah) },
                 onFavoriteClick = { onToggleFavorite(surah.number) },
+                onDownloadClick = { onDownloadSurah(surah) },
                 modifier = Modifier.padding(vertical = 5.dp)
             )
         }

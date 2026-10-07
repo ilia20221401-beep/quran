@@ -120,15 +120,28 @@ fun MiniPlayerBar(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
-                    Text(
-                        text = playerState.currentReciter.namePersian,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 11.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = playerState.currentReciter.namePersian,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (playerState.isOfflinePlayback) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "• ذخیره آفلاین",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+                    }
                 }
 
                 // Reciter quick switch button

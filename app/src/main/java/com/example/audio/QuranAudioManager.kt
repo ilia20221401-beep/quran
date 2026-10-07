@@ -32,6 +32,7 @@ data class AudioPlayerState(
     val currentReciter: Reciter = RecitersData.defaultReciter,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    val isOfflinePlayback: Boolean = false,
     val currentPositionMs: Long = 0L,
     val totalDurationMs: Long = 0L,
     val playbackSpeed: Float = 1.0f,
@@ -41,7 +42,10 @@ data class AudioPlayerState(
     val errorMessage: String? = null
 )
 
-class QuranAudioManager(private val context: Context) {
+class QuranAudioManager(
+    private val context: Context,
+    val cacheManager: QuranAudioCacheManager = QuranAudioCacheManager(context)
+) {
     private enum class InternalState {
         IDLE,
         PREPARING,
@@ -77,7 +81,7 @@ class QuranAudioManager(private val context: Context) {
         internalState = InternalState.IDLE
     }
 
-    private fun createAndPreparePlayer(audioUrl: String): Boolean {
+    private fun createAndPreparePlayer(source: String, isLocalFile: Boolean): Boolean {
         safeReleasePlayer()
 
         return try {
@@ -129,17 +133,17 @@ class QuranAudioManager(private val context: Context) {
 
                     val currentSurah = _playerState.value.currentSurah
                     val currentReciter = _playerState.value.currentReciter
-                    if (!isUsingFallback && currentSurah != null) {
+                    if (!isLocalFile && !isUsingFallback && currentSurah != null) {
                         isUsingFallback = true
                         val fallbackUrl = currentReciter.getAudioUrl(currentSurah.number, useFallback = true)
                         scope.launch {
-                            createAndPreparePlayer(fallbackUrl)
+                            createAndPreparePlayer(fallbackUrl, isLocalFile = false)
                         }
                     } else {
                         _playerState.value = _playerState.value.copy(
                             isPlaying = false,
                             isBuffering = false,
-                            errorMessage = "خطا در اتصال به سرور تلاوت (کد: $what). لطفاً اتصال اینترنت را بررسی نمایید."
+                            errorMessage = "خطا در بارگذاری فایل تلاوت (کد: $what). لطفاً اتصال اینترنت را بررسی نمایید."
                         )
                     }
                     true
@@ -147,8 +151,12 @@ class QuranAudioManager(private val context: Context) {
             }
 
             internalState = InternalState.PREPARING
-            val headers = mapOf("User-Agent" to "Mozilla/5.0 (Linux; Android) QuranApp/1.0")
-            player.setDataSource(context, Uri.parse(audioUrl), headers)
+            if (isLocalFile) {
+                player.setDataSource(source)
+            } else {
+                val headers = mapOf("User-Agent" to "Mozilla/5.0 (Linux; Android) QuranApp/1.0")
+                player.setDataSource(context, Uri.parse(source), headers)
+            }
             player.prepareAsync()
             mediaPlayer = player
             true
@@ -158,7 +166,7 @@ class QuranAudioManager(private val context: Context) {
             _playerState.value = _playerState.value.copy(
                 isBuffering = false,
                 isPlaying = false,
-                errorMessage = "خطا در شروع: ${e.localizedMessage ?: "عدم اتصال"}"
+                errorMessage = "خطا در برقراری صوت: ${e.localizedMessage ?: "عدم امکان پخش"}"
             )
             false
         }
@@ -166,18 +174,33 @@ class QuranAudioManager(private val context: Context) {
 
     fun playSurah(surah: Surah, reciter: Reciter = _playerState.value.currentReciter) {
         isUsingFallback = false
-        val audioUrl = reciter.getAudioUrl(surah.number, useFallback = false)
+        val isLocallyCached = cacheManager.isCached(reciter, surah.number)
+        val localFile = if (isLocallyCached) cacheManager.getAudioFile(reciter.id, surah.number) else null
+
         _playerState.value = _playerState.value.copy(
             currentSurah = surah,
             currentReciter = reciter,
             isBuffering = true,
             isPlaying = false,
+            isOfflinePlayback = isLocallyCached,
             currentPositionMs = 0L,
             totalDurationMs = 0L,
             errorMessage = null
         )
 
-        createAndPreparePlayer(audioUrl)
+        if (localFile != null && localFile.exists()) {
+            // 100% Offline playback directly from cache!
+            createAndPreparePlayer(localFile.absolutePath, isLocalFile = true)
+        } else {
+            // Stream online
+            val audioUrl = reciter.getAudioUrl(surah.number, useFallback = false)
+            createAndPreparePlayer(audioUrl, isLocalFile = false)
+
+            // Cache in background automatically so next time it is offline!
+            scope.launch {
+                cacheManager.downloadAndCache(surah, reciter)
+            }
+        }
     }
 
     fun pause() {
@@ -275,6 +298,7 @@ class QuranAudioManager(private val context: Context) {
         if (_playerState.value.currentReciter.id == reciter.id) return
         val currentSurah = _playerState.value.currentSurah
         _playerState.value = _playerState.value.copy(currentReciter = reciter)
+        cacheManager.refreshCachedSurahs(reciter.id)
         if (currentSurah != null && (_playerState.value.isPlaying || _playerState.value.isBuffering)) {
             playSurah(currentSurah, reciter)
         }

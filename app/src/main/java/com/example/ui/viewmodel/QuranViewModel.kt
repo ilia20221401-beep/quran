@@ -46,6 +46,8 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     val audioManager = QuranAudioManager(application)
 
     val playerState: StateFlow<AudioPlayerState> = audioManager.playerState
+    val cachedSurahNumbers: StateFlow<Set<Int>> = audioManager.cacheManager.cachedSurahNumbers
+    val downloadProgress: StateFlow<Map<Int, Float>> = audioManager.cacheManager.downloadProgress
 
     // Navigation
     private val _currentTab = MutableStateFlow(QuranTab.SURAHS)
@@ -203,6 +205,20 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopAudio() {
         audioManager.stop()
+    }
+
+    fun downloadSurah(surah: Surah) {
+        viewModelScope.launch {
+            audioManager.cacheManager.downloadAndCache(surah, playerState.value.currentReciter)
+        }
+    }
+
+    fun deleteCachedSurah(surah: Surah) {
+        audioManager.cacheManager.deleteCache(playerState.value.currentReciter, surah.number)
+    }
+
+    fun getTotalCacheSize(): String {
+        return audioManager.cacheManager.getTotalCacheSizeFormatted()
     }
 
     fun playSurahWithReader(surah: Surah) {

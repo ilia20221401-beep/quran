@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.example.audio.QuranAudioCacheManager
 import com.example.data.model.JuzDatabase
 import com.example.data.model.QuranicDuasData
 import com.example.data.model.RecitersData
@@ -55,5 +56,15 @@ class ExampleRobolectricTest {
     assertEquals(2, QuranicDuasData.ayatulKursi.surahNumber)
     assertEquals(255, QuranicDuasData.ayatulKursi.ayahNumber)
     assertEquals(11, QuranicDuasData.rabbanaDuas.size)
+  }
+
+  @Test
+  fun `verify audio cache manager functionality`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val cacheManager = QuranAudioCacheManager(context)
+    val reciter = RecitersData.defaultReciter
+    val file = cacheManager.getAudioFile(reciter.id, 1)
+    assertEquals("alafasy_1.mp3", file.name)
+    assertEquals(false, cacheManager.isCached(reciter, 1))
   }
 }

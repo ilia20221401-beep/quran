@@ -75,11 +75,14 @@ fun SurahListScreen(
     selectedFilter: SurahFilter,
     playerState: AudioPlayerState,
     favoriteIds: Set<Int>,
+    cachedSurahNumbers: Set<Int> = emptySet(),
+    downloadProgress: Map<Int, Float> = emptyMap(),
     onSearchChange: (String) -> Unit,
     onFilterSelect: (SurahFilter) -> Unit,
     onSurahClick: (Surah) -> Unit,
     onPlaySurah: (Surah) -> Unit,
     onToggleFavorite: (Int) -> Unit,
+    onDownloadSurah: (Surah) -> Unit = {},
     onSelectReciter: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -431,9 +434,12 @@ fun SurahListScreen(
                     isPlaying = isCurrent && playerState.isPlaying,
                     isBuffering = isCurrent && playerState.isBuffering,
                     isFavorite = isFavorite,
+                    isCached = cachedSurahNumbers.contains(surah.number),
+                    downloadProgress = downloadProgress[surah.number],
                     onPlayClick = { onPlaySurah(surah) },
                     onReadClick = { onSurahClick(surah) },
                     onFavoriteClick = { onToggleFavorite(surah.number) },
+                    onDownloadClick = { onDownloadSurah(surah) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)
                 )
             }

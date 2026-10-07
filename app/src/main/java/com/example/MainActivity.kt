@@ -79,6 +79,9 @@ fun QuranAppMain(viewModel: QuranViewModel) {
     val showReciterSheet by viewModel.showReciterSheet.collectAsStateWithLifecycle()
     val showFullPlayerDialog by viewModel.showFullPlayerDialog.collectAsStateWithLifecycle()
 
+    val cachedSurahNumbers by viewModel.cachedSurahNumbers.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+
     val dhikrCount by viewModel.dhikrCount.collectAsStateWithLifecycle()
     val dhikrTarget by viewModel.dhikrTarget.collectAsStateWithLifecycle()
     val selectedDhikrPreset by viewModel.selectedDhikrPreset.collectAsStateWithLifecycle()
@@ -211,11 +214,14 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                         selectedFilter = selectedFilter,
                         playerState = playerState,
                         favoriteIds = favoriteIds,
+                        cachedSurahNumbers = cachedSurahNumbers,
+                        downloadProgress = downloadProgress,
                         onSearchChange = { viewModel.setSearchQuery(it) },
                         onFilterSelect = { viewModel.setFilter(it) },
                         onSurahClick = { viewModel.openSurahReader(it) },
                         onPlaySurah = { viewModel.onSurahAction(it) },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
+                        onDownloadSurah = { viewModel.downloadSurah(it) },
                         onSelectReciter = { viewModel.setShowReciterSheet(true) }
                     )
                 }
@@ -251,9 +257,12 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                     FavoritesScreen(
                         favoriteIds = favoriteIds,
                         playerState = playerState,
+                        cachedSurahNumbers = cachedSurahNumbers,
+                        downloadProgress = downloadProgress,
                         onSurahClick = { viewModel.openSurahReader(it) },
                         onPlaySurah = { viewModel.onSurahAction(it) },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
+                        onDownloadSurah = { viewModel.downloadSurah(it) },
                         onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
                     )
                 }
