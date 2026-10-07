@@ -1,0 +1,6 @@
+{
+  "name": "قرآن کریم",
+  "description": "برنامه کامل قرآن کریم شامل تمامی ۱۱۴ سوره، متن آیات با ترجمه فارسی، تلاوت صوتی با قاریان برجسته و امکانات جستجو و نشانه‌گذاری",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
