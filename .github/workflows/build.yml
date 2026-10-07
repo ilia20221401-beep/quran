@@ -26,7 +26,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'cmdline-tools;latest platforms;android-34 build-tools;34.0.0'
+          packages: 'cmdline-tools;latest platforms;android-36 build-tools;36.0.0'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -43,7 +43,7 @@ jobs:
               cp .env.example .env
             else
               touch .env
-          fi
+            fi
           fi
 
           # Prepare release keystore:
@@ -69,14 +69,17 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'quran_release_key_2026' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'quran_release_key_2026' }}
-          JAVA_OPTS: '-Djava.awt.headless=true'
-          GRADLE_OPTS: '-Dorg.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64'
+          JAVA_TOOL_OPTIONS: '-Dcom.sun.jndi.ldap.object.trustURLCodebase=false -Djava.awt.headless=true'
+          GRADLE_OPTS: '-Dfile.encoding=UTF-8 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dorg.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64'
         run: |
           ./gradlew assembleRelease \
             --stacktrace \
-            --info \
+            --parallel \
+            --build-cache \
             -Dksp.incremental=false \
-            -Dksp.ignore.classdir.missing.dir=true
+            -Dksp.incremental.log=false \
+            -Dksp.ignore.classdir.missing.dir=true \
+            -Dorg.gradle.workers.max=4
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
