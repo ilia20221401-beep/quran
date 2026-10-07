@@ -6,7 +6,8 @@ data class Reciter(
     val nameArabic: String,
     val style: String,
     val primaryUrlPattern: String,
-    val fallbackUrlPattern: String
+    val fallbackUrlPattern: String,
+    val quranComId: Int? = null
 ) {
     fun getAudioUrl(surahNumber: Int, useFallback: Boolean = false): String {
         val pattern = if (useFallback) fallbackUrlPattern else primaryUrlPattern
@@ -27,7 +28,8 @@ object RecitersData {
         nameArabic = "مشاري راشد العفاسي",
         style = "ترتیل دلنشین و آرام‌بخش",
         primaryUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
-        fallbackUrlPattern = "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/{surah}.mp3"
+        fallbackUrlPattern = "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/{surah}.mp3",
+        quranComId = 7
     )
 
     val allReciters: List<Reciter> = listOf(
@@ -38,7 +40,8 @@ object RecitersData {
             nameArabic = "عبد الباسط عبد الصمد",
             style = "ترتیل ملکوتی و اصیل",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/abdulbasit-abdulsamad/r3/%03d.mp3",
-            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/abdul_baset/murattal/{surah}.mp3"
+            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/abdul_baset/murattal/{surah}.mp3",
+            quranComId = 2
         ),
         Reciter(
             id = "minshawi",
@@ -46,7 +49,8 @@ object RecitersData {
             nameArabic = "محمد صديق المنشاوي",
             style = "ترتیل حزین و ماندگار",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/muhammad-minshawi/r1/%03d.mp3",
-            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/siddiq_minshawi/murattal/{surah}.mp3"
+            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/siddiq_minshawi/murattal/{surah}.mp3",
+            quranComId = 9
         ),
         Reciter(
             id = "husary",
@@ -54,7 +58,8 @@ object RecitersData {
             nameArabic = "محمود خليل الحصري",
             style = "ترتیل آموزشی و دقیق",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/mahmoud-husary/r1/%03d.mp3",
-            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/khalil_al_husary/murattal/{surah}.mp3"
+            fallbackUrlPattern = "https://download.quranicaudio.com/qdc/khalil_al_husary/murattal/{surah}.mp3",
+            quranComId = 6
         ),
         Reciter(
             id = "ghamdi",
@@ -62,7 +67,8 @@ object RecitersData {
             nameArabic = "سعد الغامدي",
             style = "ترتیل روان و دلنشین",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/saad-ghamdi/r1/%03d.mp3",
-            fallbackUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3"
+            fallbackUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
+            quranComId = null
         )
     )
 }

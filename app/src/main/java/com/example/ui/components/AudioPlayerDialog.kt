@@ -190,9 +190,14 @@ fun AudioPlayerDialog(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = "سوره ${surah.namePersian} • ${surah.numberOfAyahs} آیه • ${surah.revelationType}",
+                                text = if (playerState.activeAyahNumber != null) {
+                                    "در حال تلاوت آیه ${playerState.activeAyahNumber} از ${surah.numberOfAyahs} • جزء ${surah.juz}"
+                                } else {
+                                    "سوره ${surah.namePersian} • ${surah.numberOfAyahs} آیه • ${surah.revelationType}"
+                                },
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (playerState.activeAyahNumber != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (playerState.activeAyahNumber != null) FontWeight.Bold else FontWeight.Normal
                                 )
                             )
                         }
@@ -387,9 +392,9 @@ fun AudioPlayerDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val nextRepeatMode = when (playerState.repeatMode) {
-                        RepeatMode.AUTO_PLAY_NEXT -> RepeatMode.REPEAT_ONE
-                        RepeatMode.REPEAT_ONE -> RepeatMode.REPEAT_NONE
-                        RepeatMode.REPEAT_NONE -> RepeatMode.AUTO_PLAY_NEXT
+                        RepeatMode.REPEAT_NONE -> RepeatMode.REPEAT_ONE
+                        RepeatMode.REPEAT_ONE -> RepeatMode.AUTO_PLAY_NEXT
+                        RepeatMode.AUTO_PLAY_NEXT -> RepeatMode.REPEAT_NONE
                     }
 
                     OutlinedButton(
@@ -397,7 +402,11 @@ fun AudioPlayerDialog(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(
-                            imageVector = if (playerState.repeatMode == RepeatMode.REPEAT_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                            imageVector = when (playerState.repeatMode) {
+                                RepeatMode.REPEAT_ONE -> Icons.Default.RepeatOne
+                                RepeatMode.AUTO_PLAY_NEXT -> Icons.Default.Repeat
+                                RepeatMode.REPEAT_NONE -> Icons.Default.Stop
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )

@@ -1,7 +1,10 @@
 package com.example.data.remote
 
+import android.content.Context
 import com.example.data.model.Ayah
+import com.example.data.model.Reciter
 import com.example.data.model.SurahDatabase
+import com.example.data.model.VerseTiming
 import com.squareup.moshi.Json
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -39,7 +42,31 @@ interface QuranApiService {
     ): QuranApiResponse
 }
 
-class QuranRepository {
+data class QuranComTimestampsResponse(
+    @Json(name = "audio_file") val audioFile: QuranComAudioFile?
+)
+
+data class QuranComAudioFile(
+    @Json(name = "chapter_id") val chapterId: Int?,
+    @Json(name = "timestamps") val timestamps: List<QuranComTimestampItem>?
+)
+
+data class QuranComTimestampItem(
+    @Json(name = "verse_key") val verseKey: String?,
+    @Json(name = "timestamp_from") val timestampFrom: Double?,
+    @Json(name = "timestamp_to") val timestampTo: Double?,
+    @Json(name = "duration") val duration: Double?
+)
+
+interface QuranTimingsApiService {
+    @GET("chapter_recitations/{reciterId}/{chapterId}?segments=true")
+    suspend fun getChapterRecitationTimings(
+        @Path("reciterId") reciterId: Int,
+        @Path("chapterId") chapterId: Int
+    ): QuranComTimestampsResponse
+}
+
+class QuranRepository(private val context: Context? = null) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -56,8 +83,16 @@ class QuranRepository {
         .build()
         .create(QuranApiService::class.java)
 
+    private val timingsApi: QuranTimingsApiService = Retrofit.Builder()
+        .baseUrl("https://api.quran.com/api/v4/")
+        .client(client)
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+        .create(QuranTimingsApiService::class.java)
+
     // In-memory cache for loaded surahs
     private val versesCache = mutableMapOf<Int, List<Ayah>>()
+    private val timingsMemoryCache = mutableMapOf<String, List<VerseTiming>>()
 
     suspend fun getSurahVerses(surahNumber: Int): List<Ayah> = withContext(Dispatchers.IO) {
         // Check cache first
@@ -122,5 +157,123 @@ class QuranRepository {
             )
         )
         return@withContext placeholder
+    }
+
+    suspend fun getVerseTimings(
+        surahNumber: Int,
+        reciter: Reciter,
+        ayahs: List<Ayah>,
+        totalDurationMs: Long = 0L
+    ): List<VerseTiming> = withContext(Dispatchers.IO) {
+        val cacheKey = "${reciter.id}_$surahNumber"
+        timingsMemoryCache[cacheKey]?.let { return@withContext it }
+
+        // Check disk cache if context available
+        context?.let { ctx ->
+            val prefs = ctx.getSharedPreferences("quran_timing_cache", Context.MODE_PRIVATE)
+            val raw = prefs.getString(cacheKey, null)
+            if (!raw.isNullOrEmpty()) {
+                val parsed = parseTimingsString(raw)
+                if (parsed.isNotEmpty()) {
+                    timingsMemoryCache[cacheKey] = parsed
+                    return@withContext parsed
+                }
+            }
+        }
+
+        // Try fetching online from Quran.com if reciter has mapped quranComId
+        if (reciter.quranComId != null) {
+            try {
+                val response = timingsApi.getChapterRecitationTimings(reciter.quranComId, surahNumber)
+                val items = response.audioFile?.timestamps
+                if (!items.isNullOrEmpty()) {
+                    val list = items.mapNotNull { item ->
+                        val ayahNum = item.verseKey?.substringAfter(":")?.toIntOrNull()
+                        val from = item.timestampFrom?.toLong() ?: 0L
+                        val to = item.timestampTo?.toLong() ?: 0L
+                        if (ayahNum != null) {
+                            VerseTiming(ayahNumber = ayahNum, startMs = from, endMs = to)
+                        } else null
+                    }.sortedBy { it.ayahNumber }
+
+                    if (list.isNotEmpty()) {
+                        timingsMemoryCache[cacheKey] = list
+                        context?.let { ctx ->
+                            val serialized = serializeTimingsString(list)
+                            ctx.getSharedPreferences("quran_timing_cache", Context.MODE_PRIVATE)
+                                .edit().putString(cacheKey, serialized).apply()
+                        }
+                        return@withContext list
+                    }
+                }
+            } catch (e: Exception) {
+                // Silently fall through to estimation
+            }
+        }
+
+        // Proportional estimation fallback based on Arabic verse text lengths
+        val estimated = calculateEstimatedTimings(surahNumber, ayahs, totalDurationMs)
+        if (estimated.isNotEmpty() && totalDurationMs > 0) {
+            timingsMemoryCache[cacheKey] = estimated
+        }
+        return@withContext estimated
+    }
+
+    fun calculateEstimatedTimings(
+        surahNumber: Int,
+        ayahs: List<Ayah>,
+        totalDurationMs: Long
+    ): List<VerseTiming> {
+        if (ayahs.isEmpty()) return emptyList()
+
+        val effectiveDuration = if (totalDurationMs > 1000L) {
+            totalDurationMs
+        } else {
+            // Default baseline estimate ~5.5 seconds per verse
+            ayahs.size * 5500L
+        }
+
+        // Calculate Arabic character weights for each verse
+        val weights = ayahs.map { ayah ->
+            val cleanText = ayah.textArabic.replace(" ", "")
+            maxOf(cleanText.length, 10).toLong()
+        }
+        val totalWeight = weights.sum().coerceAtLeast(1L)
+
+        var currentMs = 0L
+        return ayahs.mapIndexed { index, ayah ->
+            val start = currentMs
+            val end = if (index == ayahs.lastIndex) {
+                effectiveDuration
+            } else {
+                val frac = weights[index].toDouble() / totalWeight.toDouble()
+                val verseDuration = (effectiveDuration * frac).toLong().coerceAtLeast(1500L)
+                (start + verseDuration).coerceAtMost(effectiveDuration)
+            }
+            currentMs = end
+            VerseTiming(
+                ayahNumber = ayah.numberInSurah,
+                startMs = start,
+                endMs = maxOf(end, start + 1000L)
+            )
+        }
+    }
+
+    private fun serializeTimingsString(timings: List<VerseTiming>): String {
+        return timings.joinToString(";") { "${it.ayahNumber},${it.startMs},${it.endMs}" }
+    }
+
+    private fun parseTimingsString(raw: String): List<VerseTiming> {
+        return raw.split(";").mapNotNull { part ->
+            val tokens = part.split(",")
+            if (tokens.size == 3) {
+                val num = tokens[0].toIntOrNull()
+                val start = tokens[1].toLongOrNull()
+                val end = tokens[2].toLongOrNull()
+                if (num != null && start != null && end != null) {
+                    VerseTiming(num, start, end)
+                } else null
+            } else null
+        }
     }
 }

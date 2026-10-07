@@ -42,7 +42,7 @@ data class DhikrPreset(val title: String, val meaning: String, val defaultTarget
 
 class QuranViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
-    private val repository = QuranRepository()
+    private val repository = QuranRepository(application)
     val audioManager = QuranAudioManager(application)
 
     val playerState: StateFlow<AudioPlayerState> = audioManager.playerState
@@ -187,11 +187,46 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
             val ayahs = repository.getSurahVerses(surahNumber)
             _readingAyahs.value = ayahs
             _isLoadingVerses.value = false
+            loadVerseTimings(surahNumber, ayahs)
+        }
+    }
+
+    private fun loadVerseTimings(surahNumber: Int, ayahs: List<Ayah>) {
+        viewModelScope.launch {
+            val timings = repository.getVerseTimings(
+                surahNumber = surahNumber,
+                reciter = playerState.value.currentReciter,
+                ayahs = ayahs,
+                totalDurationMs = playerState.value.totalDurationMs
+            )
+            audioManager.updateVerseTimings(timings)
         }
     }
 
     fun playSurah(surah: Surah) {
         audioManager.playSurah(surah)
+        viewModelScope.launch {
+            val ayahs = if (_readingSurah.value?.number == surah.number && _readingAyahs.value.isNotEmpty()) {
+                _readingAyahs.value
+            } else {
+                repository.getSurahVerses(surah.number)
+            }
+            loadVerseTimings(surah.number, ayahs)
+        }
+    }
+
+    fun seekToAyah(ayahNumber: Int) {
+        val current = playerState.value.currentSurah
+        val reading = _readingSurah.value
+        if (current != null && reading != null && current.number == reading.number) {
+            audioManager.seekToAyah(ayahNumber)
+        } else if (reading != null) {
+            playSurah(reading)
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(400)
+                audioManager.seekToAyah(ayahNumber)
+            }
+        }
     }
 
     fun onSurahAction(surah: Surah) {
@@ -233,6 +268,13 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun selectReciter(reciter: Reciter) {
         audioManager.setReciter(reciter)
         _showReciterSheet.value = false
+        val current = playerState.value.currentSurah ?: _readingSurah.value
+        if (current != null) {
+            viewModelScope.launch {
+                val ayahs = _readingAyahs.value.ifEmpty { repository.getSurahVerses(current.number) }
+                loadVerseTimings(current.number, ayahs)
+            }
+        }
     }
 
     fun setPlaybackSpeed(speed: Float) {

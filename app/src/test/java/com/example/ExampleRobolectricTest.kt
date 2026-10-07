@@ -67,4 +67,37 @@ class ExampleRobolectricTest {
     assertEquals("alafasy_1.mp3", file.name)
     assertEquals(false, cacheManager.isCached(reciter, 1))
   }
+
+  @Test
+  fun `verify default repeat mode is REPEAT_NONE`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val audioManager = com.example.audio.QuranAudioManager(context)
+    assertEquals(com.example.audio.RepeatMode.REPEAT_NONE, audioManager.playerState.value.repeatMode)
+    assertEquals("توقف در پایان سوره", audioManager.playerState.value.repeatMode.titleFa)
+  }
+
+  @Test
+  fun `verify verse timing calculation and active ayah tracking`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val audioManager = com.example.audio.QuranAudioManager(context)
+    val repo = com.example.data.remote.QuranRepository(context)
+
+    val testAyahs = listOf(
+        com.example.data.model.Ayah(1, "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "به نام خداوند بخشنده مهربان"),
+        com.example.data.model.Ayah(2, "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", "ستایش مخصوص خداوندی است که پروردگار جهانیان است"),
+        com.example.data.model.Ayah(3, "الرَّحْمَٰنِ الرَّحِيمِ", "بخشنده و مهربان است")
+    )
+    val totalDuration = 30_000L
+    val timings = repo.calculateEstimatedTimings(1, testAyahs, totalDuration)
+    assertEquals(3, timings.size)
+    assertEquals(1, timings[0].ayahNumber)
+    assertEquals(0L, timings[0].startMs)
+    assertEquals(totalDuration, timings.last().endMs)
+
+    audioManager.updateVerseTimings(timings)
+    assertEquals(1, audioManager.calculateActiveAyah(0L))
+    assertEquals(1, audioManager.calculateActiveAyah(timings[0].startMs + 500L))
+    assertEquals(2, audioManager.calculateActiveAyah(timings[1].startMs + 100L))
+    assertEquals(3, audioManager.calculateActiveAyah(timings[2].startMs + 100L))
+  }
 }

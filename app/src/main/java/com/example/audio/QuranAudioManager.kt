@@ -11,6 +11,7 @@ import com.example.data.model.Reciter
 import com.example.data.model.RecitersData
 import com.example.data.model.Surah
 import com.example.data.model.SurahDatabase
+import com.example.data.model.VerseTiming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -22,7 +23,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class RepeatMode(val titleFa: String) {
-    REPEAT_NONE("بدون تکرار"),
+    REPEAT_NONE("توقف در پایان سوره"),
     REPEAT_ONE("تکرار همین سوره"),
     AUTO_PLAY_NEXT("پخش پیوسته سوره‌ها")
 }
@@ -35,8 +36,9 @@ data class AudioPlayerState(
     val isOfflinePlayback: Boolean = false,
     val currentPositionMs: Long = 0L,
     val totalDurationMs: Long = 0L,
+    val activeAyahNumber: Int? = null,
     val playbackSpeed: Float = 1.0f,
-    val repeatMode: RepeatMode = RepeatMode.AUTO_PLAY_NEXT,
+    val repeatMode: RepeatMode = RepeatMode.REPEAT_NONE,
     val sleepTimerMinutes: Int = 0,
     val sleepTimerRemainingSeconds: Long = 0L,
     val errorMessage: String? = null
@@ -46,6 +48,17 @@ class QuranAudioManager(
     private val context: Context,
     val cacheManager: QuranAudioCacheManager = QuranAudioCacheManager(context)
 ) {
+    private val prefs = context.getSharedPreferences("quran_audio_prefs", Context.MODE_PRIVATE)
+
+    private fun loadRepeatMode(): RepeatMode {
+        val saved = prefs.getString("repeat_mode", RepeatMode.REPEAT_NONE.name) ?: RepeatMode.REPEAT_NONE.name
+        return try {
+            RepeatMode.valueOf(saved)
+        } catch (e: Exception) {
+            RepeatMode.REPEAT_NONE
+        }
+    }
+
     private enum class InternalState {
         IDLE,
         PREPARING,
@@ -60,9 +73,29 @@ class QuranAudioManager(
     private var isUsingFallback = false
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
+    private var currentVerseTimings: List<VerseTiming> = emptyList()
 
-    private val _playerState = MutableStateFlow(AudioPlayerState())
+    private val _playerState = MutableStateFlow(AudioPlayerState(repeatMode = loadRepeatMode()))
     val playerState: StateFlow<AudioPlayerState> = _playerState.asStateFlow()
+
+    fun updateVerseTimings(timings: List<VerseTiming>) {
+        currentVerseTimings = timings
+        val currentPos = _playerState.value.currentPositionMs
+        _playerState.value = _playerState.value.copy(
+            activeAyahNumber = calculateActiveAyah(currentPos)
+        )
+    }
+
+    fun calculateActiveAyah(positionMs: Long): Int? {
+        if (currentVerseTimings.isEmpty()) return null
+        val match = currentVerseTimings.firstOrNull { positionMs >= it.startMs && positionMs < it.endMs }
+        if (match != null) return match.ayahNumber
+        val lastTiming = currentVerseTimings.lastOrNull()
+        if (lastTiming != null && positionMs >= lastTiming.endMs) {
+            return lastTiming.ayahNumber
+        }
+        return currentVerseTimings.firstOrNull()?.ayahNumber
+    }
 
     private fun safeReleasePlayer() {
         stopProgressTracker()
@@ -242,7 +275,8 @@ class QuranAudioManager(
             isPlaying = false,
             isBuffering = false,
             currentPositionMs = 0L,
-            currentSurah = null
+            currentSurah = null,
+            activeAyahNumber = null
         )
     }
 
@@ -260,9 +294,22 @@ class QuranAudioManager(
         if (internalState == InternalState.PLAYING || internalState == InternalState.PAUSED || internalState == InternalState.PREPARED) {
             try {
                 mediaPlayer?.seekTo(positionMs.toInt())
-                _playerState.value = _playerState.value.copy(currentPositionMs = positionMs)
+                _playerState.value = _playerState.value.copy(
+                    currentPositionMs = positionMs,
+                    activeAyahNumber = calculateActiveAyah(positionMs)
+                )
             } catch (e: Exception) {
                 // Ignore seek exception
+            }
+        }
+    }
+
+    fun seekToAyah(ayahNumber: Int) {
+        val timing = currentVerseTimings.firstOrNull { it.ayahNumber == ayahNumber }
+        if (timing != null) {
+            seekTo(timing.startMs)
+            if (!_playerState.value.isPlaying) {
+                resume()
             }
         }
     }
@@ -322,6 +369,7 @@ class QuranAudioManager(
     }
 
     fun setRepeatMode(mode: RepeatMode) {
+        prefs.edit().putString("repeat_mode", mode.name).apply()
         _playerState.value = _playerState.value.copy(repeatMode = mode)
     }
 
@@ -335,8 +383,19 @@ class QuranAudioManager(
                 playNext()
             }
             RepeatMode.REPEAT_NONE -> {
-                _playerState.value = state.copy(isPlaying = false, currentPositionMs = 0L)
                 stopProgressTracker()
+                try {
+                    mediaPlayer?.seekTo(0)
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                internalState = InternalState.PREPARED
+                _playerState.value = state.copy(
+                    isPlaying = false,
+                    isBuffering = false,
+                    currentPositionMs = 0L,
+                    activeAyahNumber = null
+                )
             }
         }
     }
@@ -350,15 +409,17 @@ class QuranAudioManager(
                     if (mp != null && internalState == InternalState.PLAYING && mp.isPlaying) {
                         val current = mp.currentPosition.toLong()
                         val total = mp.duration.toLong()
+                        val activeAyah = calculateActiveAyah(current)
                         _playerState.value = _playerState.value.copy(
                             currentPositionMs = current,
-                            totalDurationMs = total
+                            totalDurationMs = total,
+                            activeAyahNumber = activeAyah
                         )
                     }
                 } catch (e: Exception) {
                     // Ignore
                 }
-                delay(350)
+                delay(200)
             }
         }
     }

@@ -108,7 +108,11 @@ fun MiniPlayerBar(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "سوره ${currentSurah.namePersian} (${currentSurah.nameArabic})",
+                        text = if (playerState.activeAyahNumber != null) {
+                            "سوره ${currentSurah.namePersian} • آیه ${playerState.activeAyahNumber}"
+                        } else {
+                            "سوره ${currentSurah.namePersian} (${currentSurah.nameArabic})"
+                        },
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.5.sp,

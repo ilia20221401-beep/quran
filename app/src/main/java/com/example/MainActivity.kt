@@ -241,7 +241,8 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                             onTogglePlay = { viewModel.onSurahAction(surahToRead) },
                             onToggleFavorite = { viewModel.toggleFavorite(surahToRead.number) },
                             onToggleTranslation = { viewModel.toggleShowTranslation() },
-                            onChangeFontSize = { viewModel.setArabicFontSize(it) }
+                            onChangeFontSize = { viewModel.setArabicFontSize(it) },
+                            onSeekToAyah = { viewModel.seekToAyah(it) }
                         )
                     }
                 }
