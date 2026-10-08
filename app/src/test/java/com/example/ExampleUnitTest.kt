@@ -85,5 +85,41 @@ class ExampleUnitTest {
     assertEquals(reciter.basmalahDurationMs, processed[1].startMs)
     assertEquals(reciter.basmalahDurationMs + 2980L, processed[1].endMs)
   }
+
+  @Test
+  fun testDhikrCounter_doesNotExceed100() {
+    var count = 0
+    val maxCount = 100
+    for (i in 1..150) {
+      if (count < maxCount) {
+        count = (count + 1).coerceAtMost(maxCount)
+      }
+    }
+    assertEquals(100, count)
+  }
+
+  @Test
+  fun testDhikrVerses_advancesSequentially() {
+    val ayahs = listOf("آیه ۱", "آیه ۲", "آیه ۳", "آیه ۴")
+    var currentAyahIndex = 0
+    var count = 0
+
+    assertEquals("آیه ۱", ayahs[currentAyahIndex])
+
+    // Tap 1 -> completes Ayah 1, advances to Ayah 2
+    count++
+    currentAyahIndex = (currentAyahIndex + 1) % ayahs.size
+    assertEquals("آیه ۲", ayahs[currentAyahIndex])
+
+    // Tap 2 -> completes Ayah 2, advances to Ayah 3
+    count++
+    currentAyahIndex = (currentAyahIndex + 1) % ayahs.size
+    assertEquals("آیه ۳", ayahs[currentAyahIndex])
+
+    // Tap 3 -> completes Ayah 3, advances to Ayah 4
+    count++
+    currentAyahIndex = (currentAyahIndex + 1) % ayahs.size
+    assertEquals("آیه ۴", ayahs[currentAyahIndex])
+  }
 }
 

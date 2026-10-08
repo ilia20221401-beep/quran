@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Subject
 import androidx.compose.material.icons.filled.TouchApp
@@ -34,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AudioPlayerDialog
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.ReciterSelectorSheet
+import com.example.ui.screens.AboutScreen
 import com.example.ui.screens.DhikrCounterScreen
 import com.example.ui.screens.DuaScreen
 import com.example.ui.screens.FavoritesScreen
@@ -85,6 +87,11 @@ fun QuranAppMain(viewModel: QuranViewModel) {
     val dhikrCount by viewModel.dhikrCount.collectAsStateWithLifecycle()
     val dhikrTarget by viewModel.dhikrTarget.collectAsStateWithLifecycle()
     val selectedDhikrPreset by viewModel.selectedDhikrPreset.collectAsStateWithLifecycle()
+    val dhikrMode by viewModel.dhikrMode.collectAsStateWithLifecycle()
+    val dhikrSurah by viewModel.dhikrSurah.collectAsStateWithLifecycle()
+    val dhikrAyahs by viewModel.dhikrAyahs.collectAsStateWithLifecycle()
+    val dhikrAyahIndex by viewModel.dhikrAyahIndex.collectAsStateWithLifecycle()
+    val verseRepeatTarget by viewModel.verseRepeatTarget.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -196,6 +203,24 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                         ),
                         modifier = Modifier.testTag("nav_item_tasbih")
                     )
+
+                    NavigationBarItem(
+                        selected = currentTab == QuranTab.ABOUT,
+                        onClick = { viewModel.navigateTo(QuranTab.ABOUT) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "درباره"
+                            )
+                        },
+                        label = { Text("درباره") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.testTag("nav_item_about")
+                    )
                 }
             }
         }
@@ -270,13 +295,29 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
                 QuranTab.TASBIH -> {
                     DhikrCounterScreen(
+                        dhikrMode = dhikrMode,
+                        currentSurah = dhikrSurah,
+                        ayahs = dhikrAyahs,
+                        currentAyahIndex = dhikrAyahIndex,
+                        verseRepeatTarget = verseRepeatTarget,
                         presets = viewModel.dhikrPresets,
                         selectedPreset = selectedDhikrPreset,
                         count = dhikrCount,
                         target = dhikrTarget,
                         onIncrement = { viewModel.incrementDhikr() },
                         onReset = { viewModel.resetDhikr() },
+                        onNextAyah = { viewModel.nextDhikrAyah() },
+                        onPrevAyah = { viewModel.prevDhikrAyah() },
+                        onSelectSurah = { viewModel.selectDhikrSurah(it) },
+                        onSetRepeatTarget = { viewModel.setVerseRepeatTarget(it) },
+                        onSetDhikrMode = { viewModel.setDhikrMode(it) },
                         onSelectPreset = { viewModel.selectDhikrPreset(it) },
+                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
+                    )
+                }
+
+                QuranTab.ABOUT -> {
+                    AboutScreen(
                         onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
                     )
                 }

@@ -26,7 +26,8 @@ enum class QuranTab {
     READER,
     FAVORITES,
     DUAS,
-    TASBIH
+    TASBIH,
+    ABOUT
 }
 
 enum class SurahFilter(val titleFa: String) {
@@ -36,6 +37,11 @@ enum class SurahFilter(val titleFa: String) {
     MEDINAN("مدنی"),
     POPULAR("پرخوانش"),
     FAVORITES("نشان‌شده‌ها")
+}
+
+enum class DhikrMode {
+    QURAN_VERSES,
+    GENERAL_DHIKR
 }
 
 data class DhikrPreset(val title: String, val meaning: String, val defaultTarget: Int)
@@ -92,6 +98,24 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     val showFullPlayerDialog: StateFlow<Boolean> = _showFullPlayerDialog.asStateFlow()
 
     // Digital Tasbih state
+    private val _dhikrMode = MutableStateFlow(DhikrMode.QURAN_VERSES)
+    val dhikrMode: StateFlow<DhikrMode> = _dhikrMode.asStateFlow()
+
+    private val _dhikrSurah = MutableStateFlow(SurahDatabase.getSurah(1) ?: SurahDatabase.surahs[0])
+    val dhikrSurah: StateFlow<Surah> = _dhikrSurah.asStateFlow()
+
+    private val _dhikrAyahs = MutableStateFlow<List<Ayah>>(SurahDatabase.offlineVersesMap[1] ?: emptyList())
+    val dhikrAyahs: StateFlow<List<Ayah>> = _dhikrAyahs.asStateFlow()
+
+    private val _dhikrAyahIndex = MutableStateFlow(0)
+    val dhikrAyahIndex: StateFlow<Int> = _dhikrAyahIndex.asStateFlow()
+
+    private val _verseRepeatTarget = MutableStateFlow(1)
+    val verseRepeatTarget: StateFlow<Int> = _verseRepeatTarget.asStateFlow()
+
+    private val _currentAyahRepeatCount = MutableStateFlow(0)
+    val currentAyahRepeatCount: StateFlow<Int> = _currentAyahRepeatCount.asStateFlow()
+
     val dhikrPresets = listOf(
         DhikrPreset("صَلَوَات", "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَ آلِ مُحَمَّد", 100),
         DhikrPreset("تسبیحات حضرت زهرا (س)", "الله اکبر (۳۴) - الحمد لله (۳۳) - سبحان الله (۳۳)", 100),
@@ -329,19 +353,74 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Tasbih methods
+    fun setDhikrMode(mode: DhikrMode) {
+        _dhikrMode.value = mode
+        resetDhikr()
+    }
+
+    fun selectDhikrSurah(surah: Surah) {
+        _dhikrSurah.value = surah
+        viewModelScope.launch {
+            val ayahs = repository.getSurahVerses(surah.number)
+            _dhikrAyahs.value = ayahs
+            _dhikrAyahIndex.value = 0
+            _currentAyahRepeatCount.value = 0
+            resetDhikr()
+        }
+    }
+
+    fun nextDhikrAyah() {
+        val ayahs = _dhikrAyahs.value
+        if (ayahs.isNotEmpty()) {
+            _dhikrAyahIndex.value = (_dhikrAyahIndex.value + 1) % ayahs.size
+            _currentAyahRepeatCount.value = 0
+        }
+    }
+
+    fun prevDhikrAyah() {
+        val ayahs = _dhikrAyahs.value
+        if (ayahs.isNotEmpty()) {
+            _dhikrAyahIndex.value = if (_dhikrAyahIndex.value > 0) _dhikrAyahIndex.value - 1 else ayahs.size - 1
+            _currentAyahRepeatCount.value = 0
+        }
+    }
+
+    fun setVerseRepeatTarget(target: Int) {
+        _verseRepeatTarget.value = target.coerceAtLeast(1)
+        _currentAyahRepeatCount.value = 0
+    }
+
     fun incrementDhikr() {
-        val next = _dhikrCount.value + 1
+        // Enforce strict maximum of 100
+        if (_dhikrCount.value >= 100) return
+        val next = (_dhikrCount.value + 1).coerceAtMost(100)
         _dhikrCount.value = next
+
+        if (_dhikrMode.value == DhikrMode.QURAN_VERSES) {
+            val ayahs = _dhikrAyahs.value
+            if (ayahs.isNotEmpty()) {
+                val nextRepeat = _currentAyahRepeatCount.value + 1
+                if (nextRepeat >= _verseRepeatTarget.value) {
+                    _currentAyahRepeatCount.value = 0
+                    // Advance to next verse sequentially (Ayah 1 -> Ayah 2 -> Ayah 3...)
+                    _dhikrAyahIndex.value = (_dhikrAyahIndex.value + 1) % ayahs.size
+                } else {
+                    _currentAyahRepeatCount.value = nextRepeat
+                }
+            }
+        }
     }
 
     fun resetDhikr() {
         _dhikrCount.value = 0
+        _dhikrAyahIndex.value = 0
+        _currentAyahRepeatCount.value = 0
     }
 
     fun selectDhikrPreset(preset: DhikrPreset) {
         _selectedDhikrPreset.value = preset
-        _dhikrTarget.value = preset.defaultTarget
-        _dhikrCount.value = 0
+        _dhikrTarget.value = minOf(preset.defaultTarget, 100)
+        resetDhikr()
     }
 
     // Persistence
