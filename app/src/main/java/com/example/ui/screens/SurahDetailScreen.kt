@@ -73,6 +73,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.audio.AudioPlayerState
+import com.example.data.model.AYAH_BASMALAH
+import com.example.data.model.AYAH_ISTIADHA
 import com.example.data.model.Ayah
 import com.example.data.model.Surah
 
@@ -107,10 +109,18 @@ fun SurahDetailScreen(
     // Auto-scroll to the currently reciting verse
     LaunchedEffect(activeAyahNumber, isPlayingThisSurah, autoScrollEnabled) {
         if (autoScrollEnabled && isPlayingThisSurah && activeAyahNumber != null) {
-            val ayahIndex = ayahs.indexOfFirst { it.numberInSurah == activeAyahNumber }
-            if (ayahIndex >= 0) {
-                // If Bismillah banner is present at index 0, add 1 to list item position
-                val targetIndex = if (surah.number != 9) ayahIndex + 1 else ayahIndex
+            val targetIndex = when {
+                activeAyahNumber == AYAH_ISTIADHA -> 0
+                activeAyahNumber == AYAH_BASMALAH -> if (surah.number != 1 && surah.number != 9) 1 else 0
+                else -> {
+                    val ayahIndex = ayahs.indexOfFirst { it.numberInSurah == activeAyahNumber }
+                    if (ayahIndex >= 0) {
+                        val headerCount = if (surah.number == 1 || surah.number == 9) 1 else 2
+                        headerCount + ayahIndex
+                    } else null
+                }
+            }
+            if (targetIndex != null) {
                 listState.animateScrollToItem(targetIndex)
             }
         }
@@ -231,6 +241,12 @@ fun SurahDetailScreen(
 
         // Live Recitation Status Strip (when this surah is currently playing)
         if (isThisSurahSelected && activeAyahNumber != null) {
+            val statusText = when (activeAyahNumber) {
+                AYAH_ISTIADHA -> "در حال قرائت: استعاذه (أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ)"
+                AYAH_BASMALAH -> "در حال قرائت: تسمیه (بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ)"
+                1 -> if (surah.number == 1) "در حال قرائت: آیه ۱ (بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ)" else "در حال قرائت: آیه ۱ از ${surah.numberOfAyahs}"
+                else -> "در حال قرائت: آیه $activeAyahNumber از ${surah.numberOfAyahs}"
+            }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
@@ -242,7 +258,10 @@ fun SurahDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.GraphicEq,
                             contentDescription = null,
@@ -251,16 +270,17 @@ fun SurahDetailScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "در حال قرائت: آیه $activeAyahNumber از ${surah.numberOfAyahs}",
+                            text = statusText,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
-                            )
+                            ),
+                            maxLines = 1
                         )
                     }
 
                     Text(
-                        text = if (autoScrollEnabled) "پیمایش خودکار فعال" else "پیمایش خودکار متوقف",
+                        text = if (autoScrollEnabled) "پیمایش فعال" else "پیمایش متوقف",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
@@ -326,55 +346,36 @@ fun SurahDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Bismillah Banner (All surahs except Surah At-Tawbah 9)
-                if (surah.number != 9) {
+                // Istiadha Card (All surahs)
+                item {
+                    val isIstiadhaHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_ISTIADHA
+                    IstiadhaCard(
+                        isHighlighted = isIstiadhaHighlighted,
+                        isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
+                        fontSize = arabicFontSize,
+                        showTranslation = showTranslation,
+                        onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    )
+                }
+
+                // Basmalah Card (All surahs except Surah 1 and Surah 9)
+                // Note: For Surah 1 (Al-Fatiha), Ayah 1 itself IS the Basmalah!
+                if (surah.number != 1 && surah.number != 9) {
                     item {
-                        Card(
+                        val isBasmalahHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_BASMALAH
+                        BasmalahCard(
+                            isHighlighted = isBasmalahHighlighted,
+                            isPlaying = isPlayingThisSurah && isBasmalahHighlighted,
+                            fontSize = arabicFontSize,
+                            showTranslation = showTranslation,
+                            onPlay = { onSeekToAyah(AYAH_BASMALAH) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 10.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                            )
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f)
-                                            )
-                                        )
-                                    )
-                                    .padding(vertical = 20.dp, horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                                        style = MaterialTheme.typography.headlineSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 24.sp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        ),
-                                        textAlign = TextAlign.Center
-                                    )
-                                    if (showTranslation) {
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = "به نام خداوند بخشنده مهربان",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            ),
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                                .padding(vertical = 6.dp)
+                        )
                     }
                 }
 
@@ -602,6 +603,232 @@ fun AyahCard(
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Right
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun IstiadhaCard(
+    isHighlighted: Boolean,
+    isPlaying: Boolean,
+    fontSize: Float,
+    showTranslation: Boolean,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardBgColor by animateColorAsState(
+        targetValue = if (isHighlighted) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        },
+        animationSpec = tween(durationMillis = 350),
+        label = "istiadha_card_bg"
+    )
+
+    val cardBorder = if (isHighlighted) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    }
+
+    Card(
+        modifier = modifier.testTag("istiadha_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        border = cardBorder,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 4.dp else 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header Row with Badge & Listen action
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    contentColor = if (isHighlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isPlaying) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = if (isPlaying) "در حال تلاوت استعاذه" else "استعاذه (پناه‌جویی)",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onPlay,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("play_istiadha")
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = "شنیدن استعاذه",
+                        tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Arabic text: اعوذ بالله من الشیطان الرجیم
+            Text(
+                text = "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = fontSize.sp,
+                    color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (showTranslation) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "پناه می‌برم به خداوند از شر شیطان رانده‌شده",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BasmalahCard(
+    isHighlighted: Boolean,
+    isPlaying: Boolean,
+    fontSize: Float,
+    showTranslation: Boolean,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardBgColor by animateColorAsState(
+        targetValue = if (isHighlighted) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        },
+        animationSpec = tween(durationMillis = 350),
+        label = "basmalah_card_bg"
+    )
+
+    val cardBorder = if (isHighlighted) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    }
+
+    Card(
+        modifier = modifier.testTag("basmalah_card"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        border = cardBorder,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 4.dp else 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header Row with Badge & Listen action
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    contentColor = if (isHighlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isPlaying) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = if (isPlaying) "در حال تلاوت تسمیه" else "تسمیه (آغاز با نام خدا)",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onPlay,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("play_basmalah")
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = "شنیدن بسم‌الله",
+                        tint = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Arabic text: بسم الله الرحمن الرحیم
+            Text(
+                text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (fontSize + 1f).sp,
+                    color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (showTranslation) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "به نام خداوند بخشنده مهربان",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

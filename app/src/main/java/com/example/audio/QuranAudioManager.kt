@@ -7,6 +7,8 @@ import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import com.example.data.model.AYAH_BASMALAH
+import com.example.data.model.AYAH_ISTIADHA
 import com.example.data.model.Reciter
 import com.example.data.model.RecitersData
 import com.example.data.model.Surah
@@ -74,6 +76,7 @@ class QuranAudioManager(
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
     private var currentVerseTimings: List<VerseTiming> = emptyList()
+    var onDurationAvailable: ((Long) -> Unit)? = null
 
     private val _playerState = MutableStateFlow(AudioPlayerState(repeatMode = loadRepeatMode()))
     val playerState: StateFlow<AudioPlayerState> = _playerState.asStateFlow()
@@ -88,13 +91,25 @@ class QuranAudioManager(
 
     fun calculateActiveAyah(positionMs: Long): Int? {
         if (currentVerseTimings.isEmpty()) return null
+        // 1. Direct hit inside [startMs, endMs)
         val match = currentVerseTimings.firstOrNull { positionMs >= it.startMs && positionMs < it.endMs }
         if (match != null) return match.ayahNumber
-        val lastTiming = currentVerseTimings.lastOrNull()
-        if (lastTiming != null && positionMs >= lastTiming.endMs) {
+
+        // 2. Before first timing: return first timing (e.g. Istiadha or Basmalah)
+        val firstTiming = currentVerseTimings.first()
+        if (positionMs < firstTiming.startMs) {
+            return firstTiming.ayahNumber
+        }
+
+        // 3. After last timing: return last timing
+        val lastTiming = currentVerseTimings.last()
+        if (positionMs >= lastTiming.endMs) {
             return lastTiming.ayahNumber
         }
-        return currentVerseTimings.firstOrNull()?.ayahNumber
+
+        // 4. In inter-verse pause: stay on the most recent ayah that started before positionMs
+        val preceding = currentVerseTimings.lastOrNull { positionMs >= it.startMs }
+        return preceding?.ayahNumber ?: firstTiming.ayahNumber
     }
 
     private fun safeReleasePlayer() {
@@ -140,6 +155,9 @@ class QuranAudioManager(
                         totalDurationMs = duration,
                         errorMessage = null
                     )
+                    if (duration > 0L) {
+                        onDurationAvailable?.invoke(duration)
+                    }
                     applySpeed(_playerState.value.playbackSpeed)
                     try {
                         mp.start()
@@ -305,6 +323,13 @@ class QuranAudioManager(
     }
 
     fun seekToAyah(ayahNumber: Int) {
+        if (ayahNumber == AYAH_ISTIADHA) {
+            seekTo(0L)
+            if (!_playerState.value.isPlaying) {
+                resume()
+            }
+            return
+        }
         val timing = currentVerseTimings.firstOrNull { it.ayahNumber == ayahNumber }
         if (timing != null) {
             seekTo(timing.startMs)

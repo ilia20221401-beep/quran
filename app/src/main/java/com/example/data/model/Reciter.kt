@@ -7,7 +7,9 @@ data class Reciter(
     val style: String,
     val primaryUrlPattern: String,
     val fallbackUrlPattern: String,
-    val quranComId: Int? = null
+    val quranComId: Int? = null,
+    val istiadhaDurationMs: Long = 4200L,
+    val basmalahDurationMs: Long = 4800L
 ) {
     fun getAudioUrl(surahNumber: Int, useFallback: Boolean = false): String {
         val pattern = if (useFallback) fallbackUrlPattern else primaryUrlPattern
@@ -29,7 +31,9 @@ object RecitersData {
         style = "ترتیل دلنشین و آرام‌بخش",
         primaryUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
         fallbackUrlPattern = "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/{surah}.mp3",
-        quranComId = 7
+        quranComId = 7,
+        istiadhaDurationMs = 6250L,
+        basmalahDurationMs = 7100L
     )
 
     val allReciters: List<Reciter> = listOf(
@@ -41,7 +45,9 @@ object RecitersData {
             style = "ترتیل ملکوتی و اصیل",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/abdulbasit-abdulsamad/r3/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/abdul_baset/murattal/{surah}.mp3",
-            quranComId = 2
+            quranComId = 2,
+            istiadhaDurationMs = 4800L,
+            basmalahDurationMs = 4800L
         ),
         Reciter(
             id = "minshawi",
@@ -50,7 +56,9 @@ object RecitersData {
             style = "ترتیل حزین و ماندگار",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/muhammad-minshawi/r1/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/siddiq_minshawi/murattal/{surah}.mp3",
-            quranComId = 9
+            quranComId = 9,
+            istiadhaDurationMs = 6800L,
+            basmalahDurationMs = 6400L
         ),
         Reciter(
             id = "husary",
@@ -59,7 +67,9 @@ object RecitersData {
             style = "ترتیل آموزشی و دقیق",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/mahmoud-husary/r1/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/khalil_al_husary/murattal/{surah}.mp3",
-            quranComId = 6
+            quranComId = 6,
+            istiadhaDurationMs = 5800L,
+            basmalahDurationMs = 6200L
         ),
         Reciter(
             id = "ghamdi",
@@ -68,7 +78,9 @@ object RecitersData {
             style = "ترتیل روان و دلنشین",
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/saad-ghamdi/r1/%03d.mp3",
             fallbackUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
-            quranComId = null
+            quranComId = null,
+            istiadhaDurationMs = 4800L,
+            basmalahDurationMs = 5200L
         )
     )
 }

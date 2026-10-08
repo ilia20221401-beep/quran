@@ -81,6 +81,7 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val audioManager = com.example.audio.QuranAudioManager(context)
     val repo = com.example.data.remote.QuranRepository(context)
+    val reciter = com.example.data.model.RecitersData.defaultReciter
 
     val testAyahs = listOf(
         com.example.data.model.Ayah(1, "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "به نام خداوند بخشنده مهربان"),
@@ -88,16 +89,25 @@ class ExampleRobolectricTest {
         com.example.data.model.Ayah(3, "الرَّحْمَٰنِ الرَّحِيمِ", "بخشنده و مهربان است")
     )
     val totalDuration = 30_000L
-    val timings = repo.calculateEstimatedTimings(1, testAyahs, totalDuration)
-    assertEquals(3, timings.size)
-    assertEquals(1, timings[0].ayahNumber)
+    val timings = repo.calculateEstimatedTimings(1, reciter, testAyahs, totalDuration)
+    // 3 ayahs + 1 istiadha intro = 4 timings
+    assertEquals(4, timings.size)
+    // First item is Istiadha (-1), from 0ms
+    assertEquals(com.example.data.model.AYAH_ISTIADHA, timings[0].ayahNumber)
     assertEquals(0L, timings[0].startMs)
+    assertEquals(reciter.istiadhaDurationMs, timings[0].endMs)
+    // Second item is Ayah 1 (Bismillah in Surah 1), starting after Istiadha
+    assertEquals(1, timings[1].ayahNumber)
+    assertEquals(reciter.istiadhaDurationMs, timings[1].startMs)
     assertEquals(totalDuration, timings.last().endMs)
 
     audioManager.updateVerseTimings(timings)
-    assertEquals(1, audioManager.calculateActiveAyah(0L))
-    assertEquals(1, audioManager.calculateActiveAyah(timings[0].startMs + 500L))
-    assertEquals(2, audioManager.calculateActiveAyah(timings[1].startMs + 100L))
-    assertEquals(3, audioManager.calculateActiveAyah(timings[2].startMs + 100L))
+    // At 0ms (start of audio), Istiadha is active, NOT Bismillah!
+    assertEquals(com.example.data.model.AYAH_ISTIADHA, audioManager.calculateActiveAyah(0L))
+    assertEquals(com.example.data.model.AYAH_ISTIADHA, audioManager.calculateActiveAyah(500L))
+    // When Istiadha finishes, Ayah 1 (Bismillah) is active!
+    assertEquals(1, audioManager.calculateActiveAyah(timings[1].startMs + 100L))
+    assertEquals(2, audioManager.calculateActiveAyah(timings[2].startMs + 100L))
+    assertEquals(3, audioManager.calculateActiveAyah(timings[3].startMs + 100L))
   }
 }

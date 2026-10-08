@@ -142,6 +142,25 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SurahDatabase.surahs)
 
     init {
+        audioManager.onDurationAvailable = { duration ->
+            val surah = playerState.value.currentSurah ?: _readingSurah.value
+            if (surah != null) {
+                viewModelScope.launch {
+                    val ayahs = if (_readingSurah.value?.number == surah.number && _readingAyahs.value.isNotEmpty()) {
+                        _readingAyahs.value
+                    } else {
+                        repository.getSurahVerses(surah.number)
+                    }
+                    val timings = repository.getVerseTimings(
+                        surahNumber = surah.number,
+                        reciter = playerState.value.currentReciter,
+                        ayahs = ayahs,
+                        totalDurationMs = duration
+                    )
+                    audioManager.updateVerseTimings(timings)
+                }
+            }
+        }
         // Load initial surah verses
         loadSurahVerses(1)
     }

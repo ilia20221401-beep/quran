@@ -59,6 +59,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.audio.AudioPlayerState
 import com.example.audio.RepeatMode
+import com.example.data.model.AYAH_BASMALAH
+import com.example.data.model.AYAH_ISTIADHA
 import java.util.Locale
 
 @Composable
@@ -190,10 +192,11 @@ fun AudioPlayerDialog(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = if (playerState.activeAyahNumber != null) {
-                                    "در حال تلاوت آیه ${playerState.activeAyahNumber} از ${surah.numberOfAyahs} • جزء ${surah.juz}"
-                                } else {
-                                    "سوره ${surah.namePersian} • ${surah.numberOfAyahs} آیه • ${surah.revelationType}"
+                                text = when (playerState.activeAyahNumber) {
+                                    AYAH_ISTIADHA -> "در حال تلاوت استعاذه (اعوذ بالله من الشیطان الرجیم)"
+                                    AYAH_BASMALAH -> "در حال تلاوت تسمیه (بسم الله الرحمن الرحیم)"
+                                    null -> "سوره ${surah.namePersian} • ${surah.numberOfAyahs} آیه • ${surah.revelationType}"
+                                    else -> "در حال تلاوت آیه ${playerState.activeAyahNumber} از ${surah.numberOfAyahs} • جزء ${surah.juz}"
                                 },
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = if (playerState.activeAyahNumber != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,

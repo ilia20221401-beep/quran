@@ -40,6 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.audio.AudioPlayerState
+import com.example.data.model.AYAH_BASMALAH
+import com.example.data.model.AYAH_ISTIADHA
+import com.example.data.model.Surah
 
 @Composable
 fun MiniPlayerBar(
@@ -108,10 +111,11 @@ fun MiniPlayerBar(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = if (playerState.activeAyahNumber != null) {
-                            "سوره ${currentSurah.namePersian} • آیه ${playerState.activeAyahNumber}"
-                        } else {
-                            "سوره ${currentSurah.namePersian} (${currentSurah.nameArabic})"
+                        text = when (playerState.activeAyahNumber) {
+                            AYAH_ISTIADHA -> "سوره ${currentSurah.namePersian} • استعاذه"
+                            AYAH_BASMALAH -> "سوره ${currentSurah.namePersian} • تسمیه (بسم‌الله)"
+                            null -> "سوره ${currentSurah.namePersian} (${currentSurah.nameArabic})"
+                            else -> "سوره ${currentSurah.namePersian} • آیه ${playerState.activeAyahNumber}"
                         },
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
