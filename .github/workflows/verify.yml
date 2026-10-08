@@ -1,15 +1,12 @@
-name: Verify APK Signature
+name: Verify Uploaded APK
 
 on:
   workflow_dispatch:
 
 jobs:
   verify:
-    name: Verify APK
+    name: Verify APK Signature
     runs-on: ubuntu-latest
-
-    permissions:
-      actions: read
 
     steps:
       - name: Checkout repository
@@ -20,51 +17,27 @@ jobs:
         with:
           packages: 'build-tools;36.0.0'
 
-      - name: Download latest successful artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p artifact
-
-          echo "Finding latest successful run..."
-
-          RUN_ID=$(gh run list \
-            --repo "${{ github.repository }}" \
-            --workflow "Add files via upload" \
-            --status success \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId')
-
-          if [ -z "$RUN_ID" ]; then
-            echo "❌ No successful run found."
-            exit 1
-          fi
-
-          echo "✅ Run ID: $RUN_ID"
-
-          gh run download "$RUN_ID" \
-            --repo "${{ github.repository }}" \
-            -n quran-karim-release-apk \
-            -D artifact
-
       - name: Find APK
         id: apk
+        shell: bash
         run: |
           echo "Searching for APK..."
 
-          APK=$(find artifact -type f -name "*.apk" | head -n 1)
+          APK=$(find . -type f -iname "*.apk" \
+            -not -path "./.git/*" \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "❌ No APK found."
-            find artifact -type f
+            echo "❌ No APK found in repository."
             exit 1
           fi
 
-          echo "✅ APK found: $APK"
+          echo "✅ APK found:"
+          echo "$APK"
+
           echo "path=$APK" >> "$GITHUB_OUTPUT"
 
-      - name: Verify APK signature
+      - name: Verify APK
         run: |
           APK="${{ steps.apk.outputs.path }}"
 
@@ -77,12 +50,12 @@ jobs:
             --print-certs \
             "$APK"
 
-      - name: Show APK SHA-256
+      - name: Calculate SHA-256
         run: |
           APK="${{ steps.apk.outputs.path }}"
 
           echo "======================================"
-          echo "             SHA-256"
+          echo "              SHA-256"
           echo "======================================"
 
           sha256sum "$APK"
