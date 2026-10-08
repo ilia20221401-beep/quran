@@ -1,11 +1,15 @@
-name: Verify Release APK
+name: Verify APK Signature
 
 on:
   workflow_dispatch:
 
 jobs:
   verify:
+    name: Verify APK
     runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
 
     steps:
       - name: Setup Android SDK
@@ -13,29 +17,74 @@ jobs:
         with:
           packages: 'build-tools;36.0.0'
 
-      - name: Download APK Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: quran-karim-release-apk
-          path: artifact
+      - name: Download latest successful artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifact
+
+          echo "Finding latest successful run..."
+
+          RUN_ID=$(gh run list \
+            --workflow "Add files via upload" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+
+          if [ -z "$RUN_ID" ]; then
+            echo "❌ No successful run found."
+            exit 1
+          fi
+
+          echo "✅ Run ID: $RUN_ID"
+
+          gh run download "$RUN_ID" \
+            -n quran-karim-release-apk \
+            -D artifact
 
       - name: Find APK
-        id: find-apk
+        id: apk
         run: |
+          echo "Searching for APK..."
+
           APK=$(find artifact -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "No APK found!"
+            echo "❌ No APK found."
+            echo "Files downloaded:"
             find artifact -type f
             exit 1
           fi
 
-          echo "Found: $APK"
-          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "✅ APK found:"
+          echo "$APK"
 
-      - name: Verify APK
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Verify APK signature
         run: |
+          APK="${{ steps.apk.outputs.path }}"
+
+          echo "======================================"
+          echo "        APK SIGNATURE VERIFICATION"
+          echo "======================================"
+
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
             --verbose \
             --print-certs \
-            "${{ steps.find-apk.outputs.apk }}"
+            "$APK"
+
+      - name: Show APK information
+        run: |
+          APK="${{ steps.apk.outputs.path }}"
+
+          echo "======================================"
+          echo "             APK INFORMATION"
+          echo "======================================"
+
+          ls -lh "$APK"
+
+          echo ""
+          echo "SHA-256:"
+          sha256sum "$APK"
