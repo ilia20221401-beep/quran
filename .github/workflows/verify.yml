@@ -1,38 +1,41 @@
-name: Verify APK Signature
+name: Verify Release APK
 
 on:
   workflow_dispatch:
 
 jobs:
   verify:
-    name: Verify APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'build-tools;36.0.0'
 
+      - name: Download APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quran-karim-release-apk
+          path: artifact
+
       - name: Find APK
-        id: apk
+        id: find-apk
         run: |
-          APK=$(find . -type f -name "*.apk" | head -n 1)
+          APK=$(find artifact -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: No APK found in repository."
+            echo "No APK found!"
+            find artifact -type f
             exit 1
           fi
 
-          echo "APK found: $APK"
-          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "Found: $APK"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
 
-      - name: Verify APK Signature
+      - name: Verify APK
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
             --verbose \
             --print-certs \
-            "${{ steps.apk.outputs.path }}"
+            "${{ steps.find-apk.outputs.apk }}"
