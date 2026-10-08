@@ -12,6 +12,9 @@ jobs:
       actions: read
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -26,6 +29,7 @@ jobs:
           echo "Finding latest successful run..."
 
           RUN_ID=$(gh run list \
+            --repo "${{ github.repository }}" \
             --workflow "Add files via upload" \
             --status success \
             --limit 1 \
@@ -40,6 +44,7 @@ jobs:
           echo "✅ Run ID: $RUN_ID"
 
           gh run download "$RUN_ID" \
+            --repo "${{ github.repository }}" \
             -n quran-karim-release-apk \
             -D artifact
 
@@ -52,14 +57,11 @@ jobs:
 
           if [ -z "$APK" ]; then
             echo "❌ No APK found."
-            echo "Files downloaded:"
             find artifact -type f
             exit 1
           fi
 
-          echo "✅ APK found:"
-          echo "$APK"
-
+          echo "✅ APK found: $APK"
           echo "path=$APK" >> "$GITHUB_OUTPUT"
 
       - name: Verify APK signature
@@ -67,7 +69,7 @@ jobs:
           APK="${{ steps.apk.outputs.path }}"
 
           echo "======================================"
-          echo "        APK SIGNATURE VERIFICATION"
+          echo "       APK SIGNATURE VERIFICATION"
           echo "======================================"
 
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
@@ -75,16 +77,12 @@ jobs:
             --print-certs \
             "$APK"
 
-      - name: Show APK information
+      - name: Show APK SHA-256
         run: |
           APK="${{ steps.apk.outputs.path }}"
 
           echo "======================================"
-          echo "             APK INFORMATION"
+          echo "             SHA-256"
           echo "======================================"
 
-          ls -lh "$APK"
-
-          echo ""
-          echo "SHA-256:"
           sha256sum "$APK"
