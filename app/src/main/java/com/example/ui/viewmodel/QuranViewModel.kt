@@ -132,7 +132,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     private val _dhikrCount = MutableStateFlow(0)
     val dhikrCount: StateFlow<Int> = _dhikrCount.asStateFlow()
 
-    private val _dhikrTarget = MutableStateFlow(100)
+    private val _dhikrTarget = MutableStateFlow(dhikrPresets[0].defaultTarget)
     val dhikrTarget: StateFlow<Int> = _dhikrTarget.asStateFlow()
 
     // Filtered surahs flow
@@ -390,10 +390,14 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         _currentAyahRepeatCount.value = 0
     }
 
+    fun setDhikrTarget(target: Int) {
+        _dhikrTarget.value = target.coerceAtLeast(1)
+    }
+
     fun incrementDhikr() {
-        // Enforce strict maximum of 100
-        if (_dhikrCount.value >= 100) return
-        val next = (_dhikrCount.value + 1).coerceAtMost(100)
+        val currentMax = _dhikrTarget.value
+        if (_dhikrCount.value >= currentMax) return
+        val next = (_dhikrCount.value + 1).coerceAtMost(currentMax)
         _dhikrCount.value = next
 
         if (_dhikrMode.value == DhikrMode.QURAN_VERSES) {
@@ -419,7 +423,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectDhikrPreset(preset: DhikrPreset) {
         _selectedDhikrPreset.value = preset
-        _dhikrTarget.value = minOf(preset.defaultTarget, 100)
+        _dhikrTarget.value = preset.defaultTarget
         resetDhikr()
     }
 

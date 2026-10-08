@@ -119,9 +119,9 @@ fun DhikrCounterScreen(
         }
     }
 
-    // Maximum counter target is strictly 100
-    val maxCount = 100
-    val progress = (count.toFloat() / maxCount.toFloat()).coerceIn(0f, 1f)
+    // Dynamic counter target based on selected Dhikr preset or mode
+    val maxCount = target
+    val progress = if (maxCount > 0) (count.toFloat() / maxCount.toFloat()).coerceIn(0f, 1f) else 0f
     val isMaxReached = count >= maxCount
 
     // Key popular surahs for Dhikr
@@ -393,7 +393,7 @@ fun DhikrCounterScreen(
                         onClick = { onSelectPreset(preset) },
                         label = {
                             Text(
-                                text = preset.title,
+                                text = "${preset.title} (${preset.defaultTarget})",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -470,7 +470,7 @@ fun DhikrCounterScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Max 100 Status Banner
+        // Target Status Banner
         if (isMaxReached) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -492,7 +492,7 @@ fun DhikrCounterScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "به سقف ۱۰۰ ذکر رسید • برای شروع دور جدید دکمه صفر کردن را بزنید",
+                        text = "به سقف $maxCount ذکر رسید • برای شروع دور جدید دکمه صفر کردن را بزنید",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -502,7 +502,7 @@ fun DhikrCounterScreen(
             }
         }
 
-        // Big Circular Counter Button (Strictly capped at 100)
+        // Big Circular Counter Button
         Box(
             modifier = Modifier
                 .size(240.dp)
@@ -565,7 +565,7 @@ fun DhikrCounterScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (isMaxReached) "تکمیل (۱۰۰ / ۱۰۰)" else "از ۱۰۰",
+                            text = if (isMaxReached) "تکمیل ($count / $maxCount)" else "از $maxCount",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
                                 fontWeight = FontWeight.SemiBold
@@ -581,7 +581,7 @@ fun DhikrCounterScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isMaxReached) "سقف ۱۰۰ تکمیل" else "لمس برای ذکر بعدی",
+                                text = if (isMaxReached) "سقف $maxCount تکمیل" else "لمس برای ذکر بعدی",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                                 )
