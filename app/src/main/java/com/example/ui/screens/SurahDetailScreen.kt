@@ -104,19 +104,21 @@ fun SurahDetailScreen(
 
     val isThisSurahSelected = playerState.currentSurah?.number == surah.number
     val isPlayingThisSurah = isThisSurahSelected && playerState.isPlaying
-    val activeAyahNumber = if (isThisSurahSelected) playerState.activeAyahNumber else null
+    val defaultFirstAyah = when (surah.number) {
+        1, 9 -> AYAH_ISTIADHA
+        else -> AYAH_BASMALAH
+    }
+    val activeAyahNumber = if (isThisSurahSelected) (playerState.activeAyahNumber ?: defaultFirstAyah) else null
 
     // Auto-scroll to the currently reciting verse
     LaunchedEffect(activeAyahNumber, isPlayingThisSurah, autoScrollEnabled) {
         if (autoScrollEnabled && isPlayingThisSurah && activeAyahNumber != null) {
             val targetIndex = when {
-                activeAyahNumber == AYAH_ISTIADHA -> 0
-                activeAyahNumber == AYAH_BASMALAH -> if (surah.number != 1 && surah.number != 9) 1 else 0
+                activeAyahNumber == AYAH_ISTIADHA || activeAyahNumber == AYAH_BASMALAH -> 0
                 else -> {
                     val ayahIndex = ayahs.indexOfFirst { it.numberInSurah == activeAyahNumber }
                     if (ayahIndex >= 0) {
-                        val headerCount = if (surah.number == 1 || surah.number == 9) 1 else 2
-                        headerCount + ayahIndex
+                        1 + ayahIndex
                     } else null
                 }
             }
@@ -346,24 +348,24 @@ fun SurahDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Istiadha Card (All surahs)
-                item {
-                    val isIstiadhaHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_ISTIADHA
-                    IstiadhaCard(
-                        isHighlighted = isIstiadhaHighlighted,
-                        isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
-                        fontSize = arabicFontSize,
-                        showTranslation = showTranslation,
-                        onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                    )
-                }
-
-                // Basmalah Card (All surahs except Surah 1 and Surah 9)
-                // Note: For Surah 1 (Al-Fatiha), Ayah 1 itself IS the Basmalah!
-                if (surah.number != 1 && surah.number != 9) {
+                // Header Item:
+                // For Surah 1 (Al-Fatiha) and Surah 9 (At-Tawbah), recitation begins with Isti'adha ("أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَٰنِ ٱلرَّجِيمِ")
+                // For all other Surahs (2..8 and 10..114), recitation begins directly with Tasmiyah / Basmalah ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ")
+                if (surah.number == 1 || surah.number == 9) {
+                    item {
+                        val isIstiadhaHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_ISTIADHA
+                        IstiadhaCard(
+                            isHighlighted = isIstiadhaHighlighted,
+                            isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
+                            fontSize = arabicFontSize,
+                            showTranslation = showTranslation,
+                            onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        )
+                    }
+                } else {
                     item {
                         val isBasmalahHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_BASMALAH
                         BasmalahCard(

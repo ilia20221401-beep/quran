@@ -32,8 +32,8 @@ object RecitersData {
         primaryUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
         fallbackUrlPattern = "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/{surah}.mp3",
         quranComId = 7,
-        istiadhaDurationMs = 6250L,
-        basmalahDurationMs = 7100L
+        istiadhaDurationMs = 5500L,
+        basmalahDurationMs = 5800L
     )
 
     val allReciters: List<Reciter> = listOf(
@@ -46,8 +46,8 @@ object RecitersData {
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/abdulbasit-abdulsamad/r3/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/abdul_baset/murattal/{surah}.mp3",
             quranComId = 2,
-            istiadhaDurationMs = 4800L,
-            basmalahDurationMs = 4800L
+            istiadhaDurationMs = 3500L,
+            basmalahDurationMs = 5200L
         ),
         Reciter(
             id = "minshawi",
@@ -57,8 +57,8 @@ object RecitersData {
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/muhammad-minshawi/r1/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/siddiq_minshawi/murattal/{surah}.mp3",
             quranComId = 9,
-            istiadhaDurationMs = 6800L,
-            basmalahDurationMs = 6400L
+            istiadhaDurationMs = 3500L,
+            basmalahDurationMs = 5200L
         ),
         Reciter(
             id = "husary",
@@ -68,8 +68,8 @@ object RecitersData {
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/mahmoud-husary/r1/%03d.mp3",
             fallbackUrlPattern = "https://download.quranicaudio.com/qdc/khalil_al_husary/murattal/{surah}.mp3",
             quranComId = 6,
-            istiadhaDurationMs = 5800L,
-            basmalahDurationMs = 6200L
+            istiadhaDurationMs = 5500L,
+            basmalahDurationMs = 6500L
         ),
         Reciter(
             id = "ghamdi",
@@ -79,8 +79,8 @@ object RecitersData {
             primaryUrlPattern = "https://cdn.mp3quran.net/audio/saad-ghamdi/r1/%03d.mp3",
             fallbackUrlPattern = "https://cdn.mp3quran.net/audio/mishary-alafasy/r1/%03d.mp3",
             quranComId = null,
-            istiadhaDurationMs = 4800L,
-            basmalahDurationMs = 5200L
+            istiadhaDurationMs = 3200L,
+            basmalahDurationMs = 4500L
         )
     )
 }

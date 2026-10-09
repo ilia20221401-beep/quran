@@ -14,7 +14,7 @@ class ExampleUnitTest {
 
   @Test
   fun testSurah1Timings_shiftsAllVersesByIstiadha() {
-    val reciter = RecitersData.defaultReciter // Alafasy: istiadha = 6250ms
+    val reciter = RecitersData.defaultReciter
     val rawTimings = listOf(
       VerseTiming(1, 0L, 6090L),
       VerseTiming(2, 6090L, 11680L),
@@ -24,20 +24,20 @@ class ExampleUnitTest {
     val processed = repository.buildCompleteTimingsWithIntro(1, reciter, rawTimings)
 
     assertEquals(4, processed.size)
-    // 1. Istiadha occupies [0, 6250ms)
+    // 1. Istiadha occupies [0, istiadhaDurationMs)
     assertEquals(AYAH_ISTIADHA, processed[0].ayahNumber)
     assertEquals(0L, processed[0].startMs)
-    assertEquals(6250L, processed[0].endMs)
+    assertEquals(reciter.istiadhaDurationMs, processed[0].endMs)
 
-    // 2. Ayah 1 (Basmalah) shifted by 6250ms -> [6250, 12340ms)
+    // 2. Ayah 1 (Basmalah) shifted by istiadhaDurationMs
     assertEquals(1, processed[1].ayahNumber)
-    assertEquals(6250L, processed[1].startMs)
-    assertEquals(6250L + 6090L, processed[1].endMs)
+    assertEquals(reciter.istiadhaDurationMs, processed[1].startMs)
+    assertEquals(reciter.istiadhaDurationMs + 6090L, processed[1].endMs)
 
-    // 3. Ayah 2 shifted by 6250ms -> [12340, 17930ms)
+    // 3. Ayah 2 shifted by istiadhaDurationMs
     assertEquals(2, processed[2].ayahNumber)
-    assertEquals(6250L + 6090L, processed[2].startMs)
-    assertEquals(6250L + 11680L, processed[2].endMs)
+    assertEquals(reciter.istiadhaDurationMs + 6090L, processed[2].startMs)
+    assertEquals(reciter.istiadhaDurationMs + 11680L, processed[2].endMs)
   }
 
   @Test
@@ -67,7 +67,7 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testSurah112Timings_includesBasmalahOnly() {
+  fun testSurah112Timings_includesIstiadhaAndBasmalah() {
     val reciter = RecitersData.defaultReciter
     val rawTimings = listOf(
       VerseTiming(1, 0L, 2980L),
@@ -76,14 +76,20 @@ class ExampleUnitTest {
 
     val processed = repository.buildCompleteTimingsWithIntro(112, reciter, rawTimings)
 
-    assertEquals(3, processed.size)
-    assertEquals(AYAH_BASMALAH, processed[0].ayahNumber)
+    assertEquals(4, processed.size)
+    // 1. Starts with Istiadha!
+    assertEquals(AYAH_ISTIADHA, processed[0].ayahNumber)
     assertEquals(0L, processed[0].startMs)
-    assertEquals(reciter.basmalahDurationMs, processed[0].endMs)
 
-    assertEquals(1, processed[1].ayahNumber)
-    assertEquals(reciter.basmalahDurationMs, processed[1].startMs)
-    assertEquals(reciter.basmalahDurationMs + 2980L, processed[1].endMs)
+    // 2. Followed by Basmalah!
+    assertEquals(AYAH_BASMALAH, processed[1].ayahNumber)
+    assertEquals(processed[0].endMs, processed[1].startMs)
+
+    // 3. Ayah 1
+    val introTotal = processed[1].endMs
+    assertEquals(1, processed[2].ayahNumber)
+    assertEquals(introTotal, processed[2].startMs)
+    assertEquals(introTotal + 2980L, processed[2].endMs)
   }
 
   @Test

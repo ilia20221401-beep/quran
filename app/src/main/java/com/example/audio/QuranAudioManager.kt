@@ -89,15 +89,23 @@ class QuranAudioManager(
         )
     }
 
+    fun initialAyahForSurah(surahNumber: Int): Int = when (surahNumber) {
+        1, 9 -> AYAH_ISTIADHA
+        else -> AYAH_BASMALAH
+    }
+
     fun calculateActiveAyah(positionMs: Long): Int? {
-        if (currentVerseTimings.isEmpty()) return null
+        if (currentVerseTimings.isEmpty()) {
+            val surahNum = _playerState.value.currentSurah?.number ?: 1
+            return initialAyahForSurah(surahNum)
+        }
         // 1. Direct hit inside [startMs, endMs)
         val match = currentVerseTimings.firstOrNull { positionMs >= it.startMs && positionMs < it.endMs }
         if (match != null) return match.ayahNumber
 
-        // 2. Before first timing: return first timing (e.g. Istiadha or Basmalah)
+        // 2. Before first timing: return first timing
         val firstTiming = currentVerseTimings.first()
-        if (positionMs < firstTiming.startMs) {
+        if (positionMs <= firstTiming.startMs) {
             return firstTiming.ayahNumber
         }
 
@@ -228,6 +236,7 @@ class QuranAudioManager(
         val isLocallyCached = cacheManager.isCached(reciter, surah.number)
         val localFile = if (isLocallyCached) cacheManager.getAudioFile(reciter.id, surah.number) else null
 
+        val initialAyah = initialAyahForSurah(surah.number)
         _playerState.value = _playerState.value.copy(
             currentSurah = surah,
             currentReciter = reciter,
@@ -236,6 +245,7 @@ class QuranAudioManager(
             isOfflinePlayback = isLocallyCached,
             currentPositionMs = 0L,
             totalDurationMs = 0L,
+            activeAyahNumber = initialAyah,
             errorMessage = null
         )
 
@@ -323,8 +333,11 @@ class QuranAudioManager(
     }
 
     fun seekToAyah(ayahNumber: Int) {
-        if (ayahNumber == AYAH_ISTIADHA) {
-            seekTo(0L)
+        if (ayahNumber == AYAH_ISTIADHA || ayahNumber == AYAH_BASMALAH) {
+            val timing = currentVerseTimings.firstOrNull { it.ayahNumber == ayahNumber }
+            val targetMs = timing?.startMs ?: 0L
+            seekTo(targetMs)
+            _playerState.value = _playerState.value.copy(activeAyahNumber = ayahNumber)
             if (!_playerState.value.isPlaying) {
                 resume()
             }
@@ -333,6 +346,7 @@ class QuranAudioManager(
         val timing = currentVerseTimings.firstOrNull { it.ayahNumber == ayahNumber }
         if (timing != null) {
             seekTo(timing.startMs)
+            _playerState.value = _playerState.value.copy(activeAyahNumber = ayahNumber)
             if (!_playerState.value.isPlaying) {
                 resume()
             }
