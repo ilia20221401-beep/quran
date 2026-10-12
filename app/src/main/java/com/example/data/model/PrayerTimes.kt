@@ -1,6 +1,7 @@
 package com.example.data.model
 
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.*
 
 data class CityInfo(
@@ -8,7 +9,9 @@ data class CityInfo(
     val nameEn: String,
     val latitude: Double,
     val longitude: Double,
-    val timeZoneOffset: Double = 3.5 // Iran Standard Time default (+3.5h)
+    val timeZoneOffset: Double = 3.5, // Iran Standard Time default (+3.5h)
+    val province: String = "",
+    val isCapital: Boolean = false
 )
 
 data class PrayerTimesResult(
@@ -23,31 +26,20 @@ data class PrayerTimesResult(
     val midnight: String,
     val qiblaBearing: Double,
     val nextPrayerName: String,
+    val nextPrayerTime: String,
     val nextPrayerRemainingFormatted: String,
+    val remainingHours: Int,
+    val remainingMinutes: Int,
+    val remainingSeconds: Int,
     val nextPrayerProgress: Float // 0f to 1f
 )
 
 object PrayerCities {
-    val defaultCity: CityInfo = CityInfo("تهران", "Tehran", 35.6892, 51.3890, 3.5)
-
-    val popularCities: List<CityInfo> = listOf(
-        defaultCity,
-        CityInfo("مشهد مقدس", "Mashhad", 36.2972, 59.6067, 3.5),
-        CityInfo("اصفهان", "Isfahan", 32.6546, 51.6680, 3.5),
-        CityInfo("شیراز", "Shiraz", 29.5918, 52.5837, 3.5),
-        CityInfo("تبریز", "Tabriz", 38.0962, 46.2738, 3.5),
-        CityInfo("قم مقدسه", "Qom", 34.6401, 50.8764, 3.5),
-        CityInfo("اهواز", "Ahvaz", 31.3183, 48.6706, 3.5),
-        CityInfo("کرمانشاه", "Kermanshah", 34.3277, 47.0778, 3.5),
-        CityInfo("رشت", "Rasht", 37.2809, 49.5924, 3.5),
-        CityInfo("کرمان", "Kerman", 30.2839, 57.0834, 3.5),
-        CityInfo("یزد", "Yazd", 31.8974, 54.3569, 3.5),
-        CityInfo("مکه مکرمه", "Mecca", 21.4225, 39.8262, 3.0),
-        CityInfo("مدینه منوره", "Medina", 24.5247, 39.5692, 3.0),
-        CityInfo("نجف اشرف", "Najaf", 32.0259, 44.3462, 3.0),
-        CityInfo("کربلای معلی", "Karbala", 32.6160, 44.0249, 3.0),
-        CityInfo("استانبول", "Istanbul", 41.0082, 28.9784, 3.0)
-    )
+    val defaultCity: CityInfo = IranCitiesData.tehran
+    val popularCities: List<CityInfo> = IranCitiesData.popularCities
+    val allCities: List<CityInfo> = IranCitiesData.allCities
+    val holyCities: List<CityInfo> = IranCitiesData.holyCities
+    val provincialCapitals: List<CityInfo> = IranCitiesData.allCities.filter { it.isCapital }
 }
 
 object PrayerTimesCalculator {
@@ -69,32 +61,39 @@ object PrayerTimesCalculator {
 
     fun calculatePrayerTimes(city: CityInfo, calendar: Calendar = Calendar.getInstance()): PrayerTimesResult {
         val dayOfYear = calendar.get(Calendar.DAY_OF_YEAR)
-        val year = calendar.get(Calendar.YEAR)
 
-        // Astronomical calculations
-        val d = (dayOfYear - 1) + (calendar.get(Calendar.HOUR_OF_DAY) - 12.0) / 24.0
-        val m = (357.529 + 0.98560028 * d) % 360.0
-        val l = (280.459 + 0.98564736 * d) % 360.0
-        val lambda = (l + 1.915 * sin(Math.toRadians(m)) + 0.020 * sin(Math.toRadians(2 * m))) % 360.0
+        // Standard NOAA Astronomical Calculation for Solar Position
+        // Fractional year in radians
+        val gamma = 2.0 * Math.PI / 365.0 * (dayOfYear - 1.0 + (calendar.get(Calendar.HOUR_OF_DAY) - 12.0) / 24.0)
 
-        val obliq = 23.439 - 0.00000036 * d
-        val alpha = Math.toDegrees(atan2(cos(Math.toRadians(obliq)) * sin(Math.toRadians(lambda)), cos(Math.toRadians(lambda))))
-        val declination = Math.toDegrees(asin(sin(Math.toRadians(obliq)) * sin(Math.toRadians(lambda))))
+        // NOAA Equation of Time in minutes
+        val eqTimeMinutes = 229.18 * (0.000075 + 0.001868 * cos(gamma) - 0.032077 * sin(gamma) -
+                0.014615 * cos(2.0 * gamma) - 0.040849 * sin(2.0 * gamma))
 
-        val equationOfTime = (l - alpha) / 15.0 // in hours
+        // Solar declination in radians
+        val declRad = 0.006918 - 0.399912 * cos(gamma) + 0.070257 * sin(gamma) -
+                0.006758 * cos(2.0 * gamma) + 0.000907 * sin(2.0 * gamma) -
+                0.002697 * cos(3.0 * gamma) + 0.00148 * sin(3.0 * gamma)
 
-        // Noon time (Dhuhr)
-        val noon = 12.0 + city.timeZoneOffset - (city.longitude / 15.0) - equationOfTime
+        // Effective timezone offset in hours
+        val effectiveTzOffset = city.timeZoneOffset
 
-        // Helper to get time offset for a given sun angle
-        fun timeForAngle(angle: Double): Double {
-            val latRad = Math.toRadians(city.latitude)
-            val decRad = Math.toRadians(declination)
-            val angRad = Math.toRadians(angle)
-            val cosH = (sin(angRad) - sin(latRad) * sin(decRad)) / (cos(latRad) * cos(decRad))
-            if (cosH > 1.0 || cosH < -1.0) return 0.0 // Sun never reaches angle (polar regions)
-            val h = Math.toDegrees(acos(cosH)) / 15.0
-            return h
+        // Solar Noon (Dhuhr) in hours:
+        // solar_noon = (720.0 - 4.0 * longitude - eqTimeMinutes + 60.0 * tzOffset) / 60.0
+        val noon = (720.0 - 4.0 * city.longitude - eqTimeMinutes + 60.0 * effectiveTzOffset) / 60.0
+
+        val latRad = Math.toRadians(city.latitude)
+
+        // Helper to get time offset in hours for a given solar altitude angle
+        fun timeForAngle(angDeg: Double): Double {
+            val angRad = Math.toRadians(angDeg)
+            val cosH = (sin(angRad) - sin(latRad) * sin(declRad)) / (cos(latRad) * cos(declRad))
+            if (cosH > 1.0 || cosH < -1.0) return 0.0
+            return Math.toDegrees(acos(cosH.coerceIn(-1.0, 1.0))) / 15.0
+        }
+
+        fun normH(h: Double): Double {
+            return ((h % 24.0) + 24.0) % 24.0
         }
 
         // Angles according to Tehran Institute of Geophysics & standard Islamic astronomy:
@@ -104,65 +103,76 @@ object PrayerTimesCalculator {
         val maghribOffset = timeForAngle(-4.5)
         val ishaOffset = timeForAngle(-14.0)
 
-        // Asr calculation (Shafi/Hanafi shadow rule)
-        val asrAngle = Math.toDegrees(atan(1.0 / (1.0 + tan(abs(Math.toRadians(city.latitude) - Math.toRadians(declination))))))
+        // Asr calculation (standard shadow rule)
+        val asrAngle = Math.toDegrees(atan(1.0 / (1.0 + tan(abs(latRad - declRad)))))
         val asrOffset = timeForAngle(asrAngle)
 
-        val fajrTime = noon - fajrOffset
-        val sunriseTime = noon - sunriseOffset
-        val dhuhrTime = noon
-        val asrTime = noon + asrOffset
-        val sunsetTime = noon + sunsetOffset
-        val maghribTime = noon + maghribOffset
-        val ishaTime = noon + ishaOffset
+        val fajrTime = normH(noon - fajrOffset)
+        val sunriseTime = normH(noon - sunriseOffset)
+        val dhuhrTime = normH(noon)
+        val asrTime = normH(noon + asrOffset)
+        val sunsetTime = normH(noon + sunsetOffset)
+        val maghribTime = normH(noon + maghribOffset)
+        val ishaTime = normH(noon + ishaOffset)
 
         // Islamic midnight (halfway between sunset/maghrib and next day's fajr)
-        val midnightTime = (maghribTime + (fajrTime + 24.0)) / 2.0 % 24.0
+        val midnightDiff = ((fajrTime + 24.0) - maghribTime) / 2.0
+        val midnightTime = normH(maghribTime + midnightDiff)
 
         fun formatHours(h: Double): String {
-            val normalized = (h + 24.0) % 24.0
+            val normalized = normH(h)
             val hours = normalized.toInt()
             val minutes = ((normalized - hours) * 60.0).roundToInt()
             val finalHours = if (minutes == 60) (hours + 1) % 24 else hours
             val finalMins = if (minutes == 60) 0 else minutes
-            return String.format("%02d:%02d", finalHours, finalMins)
+            return String.format(Locale.US, "%02d:%02d", finalHours, finalMins)
         }
 
-        val nowHours = calendar.get(Calendar.HOUR_OF_DAY) + calendar.get(Calendar.MINUTE) / 60.0 + calendar.get(Calendar.SECOND) / 3600.0
+        // Device clock current time in hours (0.00 to 23.9999)
+        val nowHours = calendar.get(Calendar.HOUR_OF_DAY) +
+                calendar.get(Calendar.MINUTE) / 60.0 +
+                calendar.get(Calendar.SECOND) / 3600.0 +
+                calendar.get(Calendar.MILLISECOND) / 3600000.0
 
         // Determine next prayer and countdown
         val prayers = listOf(
-            Triple("اذان صبح", fajrTime, "صبح"),
-            Triple("طلوع آفتاب", sunriseTime, "طلوع"),
-            Triple("اذان ظهر", dhuhrTime, "ظهر"),
-            Triple("عصر", asrTime, "عصر"),
-            Triple("غروب آفتاب", sunsetTime, "غروب"),
-            Triple("اذان مغرب", maghribTime, "مغرب"),
-            Triple("عشاء", ishaTime, "عشاء"),
-            Triple("نیمه‌شب شرعی", midnightTime, "نیمه‌شب")
+            Triple("اذان صبح", fajrTime, formatHours(fajrTime)),
+            Triple("طلوع آفتاب", sunriseTime, formatHours(sunriseTime)),
+            Triple("اذان ظهر", dhuhrTime, formatHours(dhuhrTime)),
+            Triple("عصر", asrTime, formatHours(asrTime)),
+            Triple("غروب آفتاب", sunsetTime, formatHours(sunsetTime)),
+            Triple("اذان مغرب", maghribTime, formatHours(maghribTime)),
+            Triple("عشاء", ishaTime, formatHours(ishaTime)),
+            Triple("نیمه‌شب شرعی", midnightTime, formatHours(midnightTime))
         ).sortedBy { it.second }
 
         var nextPrayer = prayers.firstOrNull { it.second > nowHours }
-        val remainingHours: Double
+        val remainingHoursVal: Double
         val totalInterval: Double
 
         if (nextPrayer != null) {
-            remainingHours = nextPrayer.second - nowHours
+            remainingHoursVal = nextPrayer.second - nowHours
             val prevIndex = prayers.indexOf(nextPrayer) - 1
             val prevTime = if (prevIndex >= 0) prayers[prevIndex].second else prayers.last().second - 24.0
             totalInterval = max(0.1, nextPrayer.second - prevTime)
         } else {
-            // Next is Fajr tomorrow
+            // All today's prayers passed; next is Fajr tomorrow morning
             nextPrayer = prayers.first()
-            remainingHours = (nextPrayer.second + 24.0) - nowHours
+            remainingHoursVal = (nextPrayer.second + 24.0) - nowHours
             totalInterval = max(0.1, (nextPrayer.second + 24.0) - prayers.last().second)
         }
 
-        val remMinsTotal = (remainingHours * 60).toInt()
-        val remH = remMinsTotal / 60
-        val remM = remMinsTotal % 60
-        val remFormatted = if (remH > 0) "$remH ساعت و $remM دقیقه" else "$remM دقیقه"
-        val progress = (1.0 - (remainingHours / totalInterval)).toFloat().coerceIn(0.05f, 0.98f)
+        val totalSeconds = (remainingHoursVal * 3600.0).roundToInt().coerceAtLeast(0)
+        val remH = totalSeconds / 3600
+        val remM = (totalSeconds % 3600) / 60
+        val remS = totalSeconds % 60
+
+        val remFormatted = when {
+            remH > 0 -> "$remH ساعت و $remM دقیقه و $remS ثانیه"
+            remM > 0 -> "$remM دقیقه و $remS ثانیه"
+            else -> "$remS ثانیه"
+        }
+        val progress = (1.0 - (remainingHoursVal / totalInterval)).toFloat().coerceIn(0.02f, 0.98f)
 
         val qibla = calculateQibla(city.latitude, city.longitude)
 
@@ -178,7 +188,11 @@ object PrayerTimesCalculator {
             midnight = formatHours(midnightTime),
             qiblaBearing = qibla,
             nextPrayerName = nextPrayer.first,
+            nextPrayerTime = nextPrayer.third,
             nextPrayerRemainingFormatted = remFormatted,
+            remainingHours = remH,
+            remainingMinutes = remM,
+            remainingSeconds = remS,
             nextPrayerProgress = progress
         )
     }

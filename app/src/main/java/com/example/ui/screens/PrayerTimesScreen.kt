@@ -27,7 +27,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.data.model.CityInfo
+import com.example.data.model.IranCitiesData
 import com.example.data.model.PrayerCities
 import com.example.data.model.PrayerTimesCalculator
 import com.example.data.model.PrayerTimesResult
@@ -87,32 +90,29 @@ fun PrayerTimesScreen(
         val lng = location.longitude
         gpsAccuracyMeters = location.accuracy
 
-        var detectedCityName: String? = null
-        try {
-            val geocoder = Geocoder(context, Locale("fa"))
-            val list = geocoder.getFromLocation(lat, lng, 1)
-            val address = list?.firstOrNull()
-            detectedCityName = address?.locality
-                ?: address?.subAdminArea
-                ?: address?.adminArea
-        } catch (e: Exception) {
-            // Geocoder service may be offline; coordinate fallback will be used
+        // Instant offline lookup for closest city without network blocking
+        val nearestCity = IranCitiesData.allCities.minByOrNull { city ->
+            val dLat = city.latitude - lat
+            val dLng = city.longitude - lng
+            dLat * dLat + dLng * dLng
         }
 
-        val nameFa = if (!detectedCityName.isNullOrBlank()) "موقعیت GPS ($detectedCityName)" else "موقعیت GPS شما"
+        val cityName = nearestCity?.nameFa ?: "موقعیت شما"
+        val nameFa = "موقعیت GPS ($cityName)"
         val nameEn = String.format(Locale.US, "%.3f° N, %.3f° E", lat, lng)
-        val tzOffset = TimeZone.getDefault().rawOffset / (1000.0 * 60 * 60)
+        val tzOffset = nearestCity?.timeZoneOffset ?: 3.5
 
         selectedCity = CityInfo(
             nameFa = nameFa,
             nameEn = nameEn,
             latitude = lat,
             longitude = lng,
-            timeZoneOffset = tzOffset
+            timeZoneOffset = tzOffset,
+            province = nearestCity?.province ?: ""
         )
         isGpsActive = true
         isLocatingGps = false
-        Toast.makeText(context, "موقعیت شما با ماهواره GPS ثبت شد: $nameFa", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "موقعیت شما با ماهواره GPS ثبت شد: $cityName", Toast.LENGTH_SHORT).show()
     }
 
     val requestLocationUpdates: () -> Unit = {
@@ -125,7 +125,7 @@ fun PrayerTimesScreen(
             val isNetworkEnabled = try { locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { false }
 
             if (!isGpsEnabled && !isNetworkEnabled) {
-                Toast.makeText(context, "لطفاً GPS یا مکان‌یاب دستگاه را روشن کنید", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "لطفاً GPS دستگاه را روشن کنید", Toast.LENGTH_LONG).show()
                 isLocatingGps = false
             } else {
                 isLocatingGps = true
@@ -173,8 +173,8 @@ fun PrayerTimesScreen(
                     if (isGpsEnabled) {
                         locationManager.requestLocationUpdates(
                             LocationManager.GPS_PROVIDER,
-                            1000L,
-                            0f,
+                            2000L,
+                            10f,
                             listener,
                             android.os.Looper.getMainLooper()
                         )
@@ -183,8 +183,8 @@ fun PrayerTimesScreen(
                     if (isNetworkEnabled) {
                         locationManager.requestLocationUpdates(
                             LocationManager.NETWORK_PROVIDER,
-                            1000L,
-                            0f,
+                            2000L,
+                            10f,
                             listener,
                             android.os.Looper.getMainLooper()
                         )
@@ -234,12 +234,7 @@ fun PrayerTimesScreen(
         }
     }
 
-    // Auto-detect GPS on entering screen
-    LaunchedEffect(Unit) {
-        onDetectGpsClick()
-    }
-
-    // Compass sensor logic
+    // Compass sensor logic with change threshold to prevent excessive recomposition
     var deviceAzimuth by remember { mutableFloatStateOf(0f) }
     DisposableEffect(Unit) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
@@ -256,9 +251,15 @@ fun PrayerTimesScreen(
                     SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
                     SensorManager.getOrientation(rotationMatrix, orientationAngles)
                     val degrees = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-                    deviceAzimuth = (degrees + 360f) % 360f
+                    val newAzimuth = (degrees + 360f) % 360f
+                    if (kotlin.math.abs(newAzimuth - deviceAzimuth) >= 1.0f) {
+                        deviceAzimuth = newAzimuth
+                    }
                 } else if (event.sensor.type == Sensor.TYPE_ORIENTATION) {
-                    deviceAzimuth = event.values[0]
+                    val newAzimuth = (event.values[0] + 360f) % 360f
+                    if (kotlin.math.abs(newAzimuth - deviceAzimuth) >= 1.0f) {
+                        deviceAzimuth = newAzimuth
+                    }
                 }
             }
 
@@ -274,12 +275,12 @@ fun PrayerTimesScreen(
         }
     }
 
-    val prayerTimes = remember(selectedCity) {
-        PrayerTimesCalculator.calculatePrayerTimes(selectedCity)
+    val calendar = remember(selectedCity) {
+        Calendar.getInstance()
     }
 
-    val todayGregorian = remember {
-        SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(Date())
+    val prayerTimes = remember(selectedCity) {
+        PrayerTimesCalculator.calculatePrayerTimes(selectedCity, calendar)
     }
 
     Scaffold(
@@ -355,9 +356,11 @@ fun PrayerTimesScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Next Prayer Countdown Hero Card
+            // Next Prayer Hero Card
             item {
-                NextPrayerHeroCard(prayerTimes = prayerTimes)
+                NextPrayerHeroCard(
+                    prayerTimes = prayerTimes
+                )
             }
 
             // Qibla Compass Section
@@ -432,7 +435,9 @@ fun PrayerTimesScreen(
 }
 
 @Composable
-private fun NextPrayerHeroCard(prayerTimes: PrayerTimesResult) {
+private fun NextPrayerHeroCard(
+    prayerTimes: PrayerTimesResult
+) {
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
@@ -457,19 +462,19 @@ private fun NextPrayerHeroCard(prayerTimes: PrayerTimesResult) {
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.AccessTime,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "نزدیک‌ترین وعده شرعی",
-                            style = MaterialTheme.typography.labelSmall.copy(
+                            text = "اوقات شرعی امروز",
+                            style = MaterialTheme.typography.labelMedium.copy(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
@@ -477,45 +482,71 @@ private fun NextPrayerHeroCard(prayerTimes: PrayerTimesResult) {
                     }
                 }
 
-                Text(
-                    text = prayerTimes.city.nameFa,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+                ) {
+                    Text(
+                        text = if (prayerTimes.city.province.isNotBlank()) {
+                            "${prayerTimes.city.nameFa} (${prayerTimes.city.province})"
+                        } else {
+                            prayerTimes.city.nameFa
+                        },
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
-                )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = prayerTimes.nextPrayerName,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = "نوبت بعدی اذان",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                    fontWeight = FontWeight.Medium
                 )
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = "زمان باقیمانده: ${prayerTimes.nextPrayerRemainingFormatted}",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = prayerTimes.nextPrayerName,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.width(14.dp))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text = prayerTimes.nextPrayerTime,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            LinearProgressIndicator(
-                progress = { prayerTimes.nextPrayerProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
+            Text(
+                text = "محاسبه شده بر اساس افق ${prayerTimes.city.nameFa}",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
             )
         }
     }
@@ -943,95 +974,303 @@ private fun CitySelectionDialog(
     onDetectGps: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategoryIndex by remember { mutableIntStateOf(0) } // 0: همه شهرهای ایران, 1: مراکز استان‌ها, 2: اماکن مقدسه
+    var expandedProvince by remember { mutableStateOf<String?>(null) }
+
+    val iranianCities: List<CityInfo> = remember {
+        IranCitiesData.allCities.filter { it.province !in listOf("عربستان", "عراق", "سوریه", "فلسطین") }
+    }
+
+    val provincesList: List<String> = remember(iranianCities) {
+        iranianCities.map { it.province }.distinct().sorted()
+    }
+
+    val filteredCities: List<CityInfo> = remember(searchQuery, selectedCategoryIndex) {
+        val trimmed = searchQuery.trim()
+        if (trimmed.isNotEmpty()) {
+            IranCitiesData.allCities.filter {
+                it.nameFa.contains(trimmed, ignoreCase = true) ||
+                it.nameEn.contains(trimmed, ignoreCase = true) ||
+                it.province.contains(trimmed, ignoreCase = true)
+            }
+        } else {
+            when (selectedCategoryIndex) {
+                1 -> PrayerCities.provincialCapitals
+                2 -> PrayerCities.holyCities
+                else -> emptyList()
+            }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = "انتخاب شهر برای اوقات شرعی",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "انتخاب شهر و قبله",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "${iranianCities.size} شهر ایران",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "محاسبه دقیق اوقات شرعی و زاویه قبله برای تمام شهرهای کشور",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
         },
         text = {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 380.dp)
+                    .heightIn(max = 480.dp)
             ) {
-                // GPS Automatic Option at top
-                item {
-                    Row(
+                // Search TextField
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text("جستجوی نام شهر یا استان...", fontSize = 13.sp)
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "جستجو",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "پاک کردن",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+
+                // Filter Tabs (when not actively searching)
+                if (searchQuery.isEmpty()) {
+                    val tabs = listOf("همه استان‌ها", "مراکز استان", "اماکن مقدسه")
+                    TabRow(
+                        selectedTabIndex = selectedCategoryIndex,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
-                            .clickable { onDetectGps() }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(bottom = 8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MyLocation,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "موقعیت‌یابی خودکار با ماهواره GPS",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            )
-                            Text(
-                                text = "محاسبه دقیق قبله و اوقات با مختصات لحظه‌ای شما",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
-                                )
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedCategoryIndex == index,
+                                onClick = { selectedCategoryIndex = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = if (selectedCategoryIndex == index) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    )
+                                }
                             )
                         }
                     }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 }
 
-                items(PrayerCities.popularCities) { city ->
-                    val isSelected = city.nameFa == currentCity.nameFa
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                            .clickable { onSelect(city) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = city.nameFa,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // GPS automatic locator item at top
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onDetectGps() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MyLocation,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "موقعیت‌یابی خودکار ماهواره‌ای (GPS)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+                                    Text(
+                                        text = "تنظیم اوقات و قبله با مختصات زنده دستگاه شما",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    // Content depends on search query or selected tab
+                    if (searchQuery.isNotEmpty()) {
+                        if (filteredCities.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "شهری با نام «$searchQuery» یافت نشد",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            items(filteredCities, key = { it.nameFa + it.province + it.latitude }) { city ->
+                                CityListItem(
+                                    city = city,
+                                    isSelected = city.nameFa == currentCity.nameFa && city.province == currentCity.province,
+                                    onClick = { onSelect(city) }
                                 )
-                            )
-                            Text(
-                                text = city.nameEn,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            }
+                        }
+                    } else if (selectedCategoryIndex == 1) {
+                        // Provincial capitals
+                        items(PrayerCities.provincialCapitals, key = { it.nameFa }) { city ->
+                            CityListItem(
+                                city = city,
+                                isSelected = city.nameFa == currentCity.nameFa,
+                                onClick = { onSelect(city) }
                             )
                         }
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                    } else if (selectedCategoryIndex == 2) {
+                        // Holy places
+                        items(PrayerCities.holyCities, key = { it.nameFa }) { city ->
+                            CityListItem(
+                                city = city,
+                                isSelected = city.nameFa == currentCity.nameFa,
+                                onClick = { onSelect(city) }
                             )
+                        }
+                    } else {
+                        // All Iranian cities grouped by province (Expandable)
+                        items(provincesList, key = { it }) { province: String ->
+                            val citiesInProvince: List<CityInfo> = iranianCities.filter { it.province == province }
+                            val isExpanded = expandedProvince == province || currentCity.province == province
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isExpanded) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clickable {
+                                        expandedProvince = if (isExpanded) null else province
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowLeft,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "استان $province",
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                                    ) {
+                                        Text(
+                                            text = "${citiesInProvince.size} شهر",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 11.sp
+                                            ),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (isExpanded) {
+                                Column(modifier = Modifier.padding(start = 12.dp)) {
+                                    citiesInProvince.forEach { city ->
+                                        CityListItem(
+                                            city = city,
+                                            isSelected = city.nameFa == currentCity.nameFa && city.province == currentCity.province,
+                                            onClick = { onSelect(city) }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1044,3 +1283,72 @@ private fun CitySelectionDialog(
         }
     )
 }
+
+@Composable
+private fun CityListItem(
+    city: CityInfo,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else Color.Transparent
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = city.nameFa,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                if (city.isCapital) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = "مرکز استان",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+            if (city.province.isNotEmpty()) {
+                Text(
+                    text = "استان ${city.province} • ${city.nameEn}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
