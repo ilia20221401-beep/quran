@@ -33,17 +33,25 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SyncDisabled
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -69,6 +77,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,6 +86,9 @@ import com.example.data.model.AYAH_BASMALAH
 import com.example.data.model.AYAH_ISTIADHA
 import com.example.data.model.Ayah
 import com.example.data.model.Surah
+import com.example.ui.components.AyahNoteDialog
+import com.example.ui.components.TafsirBottomSheet
+import com.example.ui.viewmodel.ReadingTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +100,15 @@ fun SurahDetailScreen(
     isFavorite: Boolean,
     showTranslation: Boolean,
     arabicFontSize: Float,
+    readingTheme: ReadingTheme = ReadingTheme.DEFAULT,
+    targetAyahToScroll: Int? = null,
+    onClearTargetAyahToScroll: () -> Unit = {},
+    isAyahBookmarked: (Int) -> Boolean = { false },
+    getAyahNote: (Int) -> String = { "" },
+    onToggleAyahBookmark: (Ayah) -> Unit = {},
+    onSaveAyahNote: (Ayah, String) -> Unit = { _, _ -> },
+    onDeleteAyahNote: (Ayah) -> Unit = {},
+    onChangeReadingTheme: (ReadingTheme) -> Unit = {},
     onBack: () -> Unit,
     onTogglePlay: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -99,13 +120,17 @@ fun SurahDetailScreen(
     BackHandler { onBack() }
 
     var showFontSlider by remember { mutableStateOf(false) }
+    var showThemeMenu by remember { mutableStateOf(false) }
     var autoScrollEnabled by remember { mutableStateOf(true) }
+    var activeTafsirAyah by remember { mutableStateOf<Ayah?>(null) }
+    var activeNoteAyah by remember { mutableStateOf<Ayah?>(null) }
     val listState = rememberLazyListState()
 
     val isThisSurahSelected = playerState.currentSurah?.number == surah.number
     val isPlayingThisSurah = isThisSurahSelected && playerState.isPlaying
     val defaultFirstAyah = when (surah.number) {
-        1, 9 -> AYAH_ISTIADHA
+        1 -> AYAH_ISTIADHA
+        9 -> 1
         else -> AYAH_BASMALAH
     }
     val activeAyahNumber = if (isThisSurahSelected) (playerState.activeAyahNumber ?: defaultFirstAyah) else null
@@ -113,12 +138,18 @@ fun SurahDetailScreen(
     // Auto-scroll to the currently reciting verse
     LaunchedEffect(activeAyahNumber, isPlayingThisSurah, autoScrollEnabled) {
         if (autoScrollEnabled && isPlayingThisSurah && activeAyahNumber != null) {
-            val targetIndex = when {
-                activeAyahNumber == AYAH_ISTIADHA || activeAyahNumber == AYAH_BASMALAH -> 0
+            val headerCount = when (surah.number) {
+                1 -> 1
+                9 -> 0
+                else -> 1
+            }
+            val targetIndex = when (activeAyahNumber) {
+                AYAH_ISTIADHA -> 0
+                AYAH_BASMALAH -> 0
                 else -> {
                     val ayahIndex = ayahs.indexOfFirst { it.numberInSurah == activeAyahNumber }
                     if (ayahIndex >= 0) {
-                        1 + ayahIndex
+                        headerCount + ayahIndex
                     } else null
                 }
             }
@@ -348,36 +379,43 @@ fun SurahDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Header Item:
-                // For Surah 1 (Al-Fatiha) and Surah 9 (At-Tawbah), recitation begins with Isti'adha ("أَعُوذُ بِٱللَّهِ مِنَ ٱلشَّيْطَٰنِ ٱلرَّجِيمِ")
-                // For all other Surahs (2..8 and 10..114), recitation begins directly with Tasmiyah / Basmalah ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ")
-                if (surah.number == 1 || surah.number == 9) {
-                    item {
-                        val isIstiadhaHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_ISTIADHA
-                        IstiadhaCard(
-                            isHighlighted = isIstiadhaHighlighted,
-                            isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
-                            fontSize = arabicFontSize,
-                            showTranslation = showTranslation,
-                            onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                        )
+                // Header Items:
+                // Surah 1 (Al-Fatiha): begins with Isti'adha ("أَعُوذُ بِٱللَّهِ..."), then Ayah 1 is Basmalah.
+                // Surah 9 (At-Tawbah): revealed without Basmalah, audio starts directly at Ayah 1.
+                // All other Surahs (2..8 and 10..114): reciter recites ONLY Tasmiyah / Basmalah ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ") before Ayah 1.
+                when (surah.number) {
+                    1 -> {
+                        item {
+                            val isIstiadhaHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_ISTIADHA
+                            IstiadhaCard(
+                                isHighlighted = isIstiadhaHighlighted,
+                                isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
+                                fontSize = arabicFontSize,
+                                showTranslation = showTranslation,
+                                onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                            )
+                        }
                     }
-                } else {
-                    item {
-                        val isBasmalahHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_BASMALAH
-                        BasmalahCard(
-                            isHighlighted = isBasmalahHighlighted,
-                            isPlaying = isPlayingThisSurah && isBasmalahHighlighted,
-                            fontSize = arabicFontSize,
-                            showTranslation = showTranslation,
-                            onPlay = { onSeekToAyah(AYAH_BASMALAH) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                        )
+                    9 -> {
+                        // Surah At-Tawbah: Starts directly from Ayah 1 without Basmalah or Istiadha.
+                    }
+                    else -> {
+                        item {
+                            val isBasmalahHighlighted = isThisSurahSelected && activeAyahNumber == AYAH_BASMALAH
+                            BasmalahCard(
+                                isHighlighted = isBasmalahHighlighted,
+                                isPlaying = isPlayingThisSurah && isBasmalahHighlighted,
+                                fontSize = arabicFontSize,
+                                showTranslation = showTranslation,
+                                onPlay = { onSeekToAyah(AYAH_BASMALAH) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                            )
+                        }
                     }
                 }
 

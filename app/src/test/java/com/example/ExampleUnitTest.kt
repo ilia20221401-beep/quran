@@ -41,7 +41,7 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun testSurah2Timings_includesIstiadhaAndBasmalah() {
+  fun testSurah2Timings_includesBasmalahOnly() {
     val reciter = RecitersData.defaultReciter
     val rawTimings = listOf(
       VerseTiming(1, 0L, 5000L),
@@ -50,24 +50,44 @@ class ExampleUnitTest {
 
     val processed = repository.buildCompleteTimingsWithIntro(2, reciter, rawTimings)
 
-    assertEquals(4, processed.size)
-    assertEquals(AYAH_ISTIADHA, processed[0].ayahNumber)
+    assertEquals(3, processed.size)
+    // 1. Starts directly with Basmalah (no Istiadha in Surah 2)
+    assertEquals(AYAH_BASMALAH, processed[0].ayahNumber)
     assertEquals(0L, processed[0].startMs)
+    assertEquals(reciter.basmalahDurationMs, processed[0].endMs)
 
-    assertEquals(AYAH_BASMALAH, processed[1].ayahNumber)
-    assertEquals(processed[0].endMs, processed[1].startMs)
+    // 2. Ayah 1 starts after Basmalah
+    val basmalahDuration = processed[0].endMs
+    assertEquals(1, processed[1].ayahNumber)
+    assertEquals(basmalahDuration, processed[1].startMs)
+    assertEquals(basmalahDuration + 5000L, processed[1].endMs)
 
-    val introTotal = processed[1].endMs
-    assertEquals(1, processed[2].ayahNumber)
-    assertEquals(introTotal, processed[2].startMs)
-    assertEquals(introTotal + 5000L, processed[2].endMs)
-
-    assertEquals(2, processed[3].ayahNumber)
-    assertEquals(introTotal + 5000L, processed[3].startMs)
+    assertEquals(2, processed[2].ayahNumber)
+    assertEquals(basmalahDuration + 5000L, processed[2].startMs)
   }
 
   @Test
-  fun testSurah112Timings_includesIstiadhaAndBasmalah() {
+  fun testSurah9Timings_startsDirectlyWithAyah1() {
+    val reciter = RecitersData.defaultReciter
+    val rawTimings = listOf(
+      VerseTiming(1, 0L, 15000L),
+      VerseTiming(2, 15000L, 35000L)
+    )
+
+    val processed = repository.buildCompleteTimingsWithIntro(9, reciter, rawTimings)
+
+    assertEquals(2, processed.size)
+    // Surah 9 has no Basmalah and starts directly at 0ms with Ayah 1
+    assertEquals(1, processed[0].ayahNumber)
+    assertEquals(0L, processed[0].startMs)
+    assertEquals(15000L, processed[0].endMs)
+
+    assertEquals(2, processed[1].ayahNumber)
+    assertEquals(15000L, processed[1].startMs)
+  }
+
+  @Test
+  fun testSurah112Timings_includesBasmalahOnly() {
     val reciter = RecitersData.defaultReciter
     val rawTimings = listOf(
       VerseTiming(1, 0L, 2980L),
@@ -76,20 +96,17 @@ class ExampleUnitTest {
 
     val processed = repository.buildCompleteTimingsWithIntro(112, reciter, rawTimings)
 
-    assertEquals(4, processed.size)
-    // 1. Starts with Istiadha!
-    assertEquals(AYAH_ISTIADHA, processed[0].ayahNumber)
+    assertEquals(3, processed.size)
+    // 1. Starts directly with Basmalah (no Istiadha)
+    assertEquals(AYAH_BASMALAH, processed[0].ayahNumber)
     assertEquals(0L, processed[0].startMs)
+    assertEquals(reciter.basmalahDurationMs, processed[0].endMs)
 
-    // 2. Followed by Basmalah!
-    assertEquals(AYAH_BASMALAH, processed[1].ayahNumber)
-    assertEquals(processed[0].endMs, processed[1].startMs)
-
-    // 3. Ayah 1
-    val introTotal = processed[1].endMs
-    assertEquals(1, processed[2].ayahNumber)
-    assertEquals(introTotal, processed[2].startMs)
-    assertEquals(introTotal + 2980L, processed[2].endMs)
+    // 2. Ayah 1
+    val basmalahDuration = processed[0].endMs
+    assertEquals(1, processed[1].ayahNumber)
+    assertEquals(basmalahDuration, processed[1].startMs)
+    assertEquals(basmalahDuration + 2980L, processed[1].endMs)
   }
 
   @Test

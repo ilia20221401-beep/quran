@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Subject
@@ -33,12 +34,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AudioPlayerDialog
+import com.example.ui.components.FullQuranSearchDialog
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.ReciterSelectorSheet
 import com.example.ui.screens.AboutScreen
+import com.example.ui.screens.AsmaUlHusnaScreen
 import com.example.ui.screens.DhikrCounterScreen
 import com.example.ui.screens.DuaScreen
 import com.example.ui.screens.FavoritesScreen
+import com.example.ui.screens.PrayerTimesScreen
 import com.example.ui.screens.SurahDetailScreen
 import com.example.ui.screens.SurahListScreen
 import com.example.ui.theme.QuranAppTheme
@@ -80,6 +84,9 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
     val showReciterSheet by viewModel.showReciterSheet.collectAsStateWithLifecycle()
     val showFullPlayerDialog by viewModel.showFullPlayerDialog.collectAsStateWithLifecycle()
+    val showFullSearchDialog by viewModel.showFullSearchDialog.collectAsStateWithLifecycle()
+    val readingTheme by viewModel.readingTheme.collectAsStateWithLifecycle()
+    val targetAyahToScroll by viewModel.targetAyahToScroll.collectAsStateWithLifecycle()
 
     val cachedSurahNumbers by viewModel.cachedSurahNumbers.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
@@ -148,6 +155,24 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                             indicatorColor = MaterialTheme.colorScheme.primaryContainer
                         ),
                         modifier = Modifier.testTag("nav_item_reader")
+                    )
+
+                    NavigationBarItem(
+                        selected = currentTab == QuranTab.PRAYER_TIMES,
+                        onClick = { viewModel.navigateTo(QuranTab.PRAYER_TIMES) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.Explore,
+                                contentDescription = "اوقات شرعی و قبله"
+                            )
+                        },
+                        label = { Text("اوقات و قبله") },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.testTag("nav_item_prayer_times")
                     )
 
                     NavigationBarItem(
@@ -241,6 +266,14 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                         favoriteIds = favoriteIds,
                         cachedSurahNumbers = cachedSurahNumbers,
                         downloadProgress = downloadProgress,
+                        dailyAyah = viewModel.todayDailyAyah,
+                        onOpenDailyAyah = { surahNum, ayahNum -> viewModel.openAyahInReader(surahNum, ayahNum) },
+                        onOpenPrayerTimes = { viewModel.navigateTo(QuranTab.PRAYER_TIMES) },
+                        onOpenDhikr = { viewModel.navigateTo(QuranTab.TASBIH) },
+                        onOpenDuas = { viewModel.navigateTo(QuranTab.DUAS) },
+                        onOpenAsmaUlHusna = { viewModel.navigateTo(QuranTab.ASMA_UL_HUSNA) },
+                        onOpenFullSearch = { viewModel.setShowFullSearchDialog(true) },
+                        onOpenFavorites = { viewModel.navigateTo(QuranTab.FAVORITES) },
                         onSearchChange = { viewModel.setSearchQuery(it) },
                         onFilterSelect = { viewModel.setFilter(it) },
                         onSurahClick = { viewModel.openSurahReader(it) },
@@ -262,6 +295,34 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                             isFavorite = favoriteIds.contains(surahToRead.number),
                             showTranslation = showTranslation,
                             arabicFontSize = arabicFontSize,
+                            readingTheme = readingTheme,
+                            targetAyahToScroll = targetAyahToScroll,
+                            onClearTargetAyahToScroll = { viewModel.clearTargetAyahToScroll() },
+                            isAyahBookmarked = { ayahNum -> viewModel.isAyahBookmarked(surahToRead.number, ayahNum) },
+                            getAyahNote = { ayahNum -> viewModel.getAyahNote(surahToRead.number, ayahNum) },
+                            onToggleAyahBookmark = { ayah ->
+                                viewModel.toggleAyahBookmark(
+                                    surahToRead.number,
+                                    ayah.numberInSurah,
+                                    surahToRead.namePersian,
+                                    ayah.textArabic,
+                                    ayah.textPersian
+                                )
+                            },
+                            onSaveAyahNote = { ayah, note ->
+                                viewModel.saveAyahNote(
+                                    surahToRead.number,
+                                    ayah.numberInSurah,
+                                    surahToRead.namePersian,
+                                    ayah.textArabic,
+                                    ayah.textPersian,
+                                    note
+                                )
+                            },
+                            onDeleteAyahNote = { ayah ->
+                                viewModel.deleteAyahNote(surahToRead.number, ayah.numberInSurah)
+                            },
+                            onChangeReadingTheme = { viewModel.setReadingTheme(it) },
                             onBack = { viewModel.navigateTo(QuranTab.SURAHS) },
                             onTogglePlay = { viewModel.onSurahAction(surahToRead) },
                             onToggleFavorite = { viewModel.toggleFavorite(surahToRead.number) },
@@ -316,6 +377,18 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                     )
                 }
 
+                QuranTab.PRAYER_TIMES -> {
+                    PrayerTimesScreen(
+                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
+                    )
+                }
+
+                QuranTab.ASMA_UL_HUSNA -> {
+                    AsmaUlHusnaScreen(
+                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
+                    )
+                }
+
                 QuranTab.ABOUT -> {
                     AboutScreen(
                         onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
@@ -352,6 +425,17 @@ fun QuranAppMain(viewModel: QuranViewModel) {
             onSetRepeatMode = { viewModel.setRepeatMode(it) },
             onSetSleepTimer = { viewModel.setSleepTimer(it) },
             onDismiss = { viewModel.setShowFullPlayerDialog(false) }
+        )
+    }
+
+    // Full Quran Global Search Dialog
+    if (showFullSearchDialog) {
+        FullQuranSearchDialog(
+            onSelectAyah = { surahNumber, ayahNumber ->
+                viewModel.setShowFullSearchDialog(false)
+                viewModel.openAyahInReader(surahNumber, ayahNumber)
+            },
+            onDismiss = { viewModel.setShowFullSearchDialog(false) }
         )
     }
 }

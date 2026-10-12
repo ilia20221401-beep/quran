@@ -89,9 +89,12 @@ class QuranAudioManager(
         )
     }
 
-    fun initialAyahForSurah(surahNumber: Int): Int = when (surahNumber) {
-        1, 9 -> AYAH_ISTIADHA
-        else -> AYAH_BASMALAH
+    fun initialAyahForSurah(surahNumber: Int): Int {
+        return when (surahNumber) {
+            1 -> AYAH_ISTIADHA
+            9 -> 1
+            else -> AYAH_BASMALAH
+        }
     }
 
     fun calculateActiveAyah(positionMs: Long): Int? {

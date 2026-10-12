@@ -8,6 +8,9 @@ import com.example.audio.AudioPlayerState
 import com.example.audio.QuranAudioManager
 import com.example.audio.RepeatMode
 import com.example.data.model.Ayah
+import com.example.data.model.BookmarkedAyah
+import com.example.data.model.DailyAyah
+import com.example.data.model.DailyAyahManager
 import com.example.data.model.Reciter
 import com.example.data.model.RecitersData
 import com.example.data.model.Surah
@@ -25,9 +28,17 @@ enum class QuranTab {
     SURAHS,
     READER,
     FAVORITES,
+    PRAYER_TIMES,
     DUAS,
     TASBIH,
+    ASMA_UL_HUSNA,
     ABOUT
+}
+
+enum class ReadingTheme(val titleFa: String) {
+    DEFAULT("پیش‌فرض"),
+    NIGHT("حالت شب"),
+    SEPIA("کاغذ کاهی")
 }
 
 enum class SurahFilter(val titleFa: String) {
@@ -89,6 +100,25 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _arabicFontSize = MutableStateFlow(22f)
     val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
+
+    // Reading Theme (Default, Night, Sepia)
+    private val _readingTheme = MutableStateFlow(loadReadingTheme())
+    val readingTheme: StateFlow<ReadingTheme> = _readingTheme.asStateFlow()
+
+    // Target Ayah to auto-scroll to when opening reader
+    private val _targetAyahToScroll = MutableStateFlow<Int?>(null)
+    val targetAyahToScroll: StateFlow<Int?> = _targetAyahToScroll.asStateFlow()
+
+    // Bookmarked Ayahs & Notes
+    private val _bookmarkedAyahs = MutableStateFlow<Map<String, BookmarkedAyah>>(loadBookmarkedAyahs())
+    val bookmarkedAyahs: StateFlow<Map<String, BookmarkedAyah>> = _bookmarkedAyahs.asStateFlow()
+
+    // Full Quran Search Dialog
+    private val _showFullSearchDialog = MutableStateFlow(false)
+    val showFullSearchDialog: StateFlow<Boolean> = _showFullSearchDialog.asStateFlow()
+
+    // Daily Ayah
+    val todayDailyAyah: DailyAyah = DailyAyahManager.getTodayAyah()
 
     // Dialog & Sheet states
     private val _showReciterSheet = MutableStateFlow(false)
@@ -216,12 +246,119 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         return _favoriteIds.value.contains(surahNumber)
     }
 
-    fun openSurahReader(surah: Surah) {
+    fun openSurahReader(surah: Surah, targetAyah: Int? = null) {
         _readingSurah.value = surah
         saveLastRead(surah.number)
         _lastReadSurah.value = surah
+        _targetAyahToScroll.value = targetAyah
         loadSurahVerses(surah.number)
         _currentTab.value = QuranTab.READER
+    }
+
+    fun openAyahInReader(surahNumber: Int, ayahNumber: Int) {
+        val surah = SurahDatabase.getSurah(surahNumber) ?: return
+        openSurahReader(surah, targetAyah = ayahNumber)
+    }
+
+    fun clearTargetAyahToScroll() {
+        _targetAyahToScroll.value = null
+    }
+
+    fun setReadingTheme(theme: ReadingTheme) {
+        _readingTheme.value = theme
+        prefs.edit().putString("reading_theme", theme.name).apply()
+    }
+
+    fun setShowFullSearchDialog(show: Boolean) {
+        _showFullSearchDialog.value = show
+    }
+
+    // Ayah Bookmarks & Notes
+    fun isAyahBookmarked(surahNumber: Int, ayahNumber: Int): Boolean {
+        val key = "$surahNumber:$ayahNumber"
+        return _bookmarkedAyahs.value.containsKey(key)
+    }
+
+    fun getAyahNote(surahNumber: Int, ayahNumber: Int): String {
+        val key = "$surahNumber:$ayahNumber"
+        return _bookmarkedAyahs.value[key]?.note ?: ""
+    }
+
+    fun toggleAyahBookmark(
+        surahNumber: Int,
+        ayahNumber: Int,
+        surahName: String,
+        arabic: String,
+        persian: String
+    ) {
+        val key = "$surahNumber:$ayahNumber"
+        val current = _bookmarkedAyahs.value.toMutableMap()
+        if (current.containsKey(key)) {
+            val existing = current[key]
+            if (existing != null && existing.note.isNotEmpty()) {
+                // If it has a note, keep it but toggle or keep
+                current.remove(key)
+            } else {
+                current.remove(key)
+            }
+        } else {
+            current[key] = BookmarkedAyah(
+                surahNumber = surahNumber,
+                ayahNumber = ayahNumber,
+                surahNamePersian = surahName,
+                textArabic = arabic,
+                textPersian = persian,
+                note = ""
+            )
+        }
+        _bookmarkedAyahs.value = current
+        saveBookmarkedAyahs(current)
+    }
+
+    fun saveAyahNote(
+        surahNumber: Int,
+        ayahNumber: Int,
+        surahName: String,
+        arabic: String,
+        persian: String,
+        note: String
+    ) {
+        val key = "$surahNumber:$ayahNumber"
+        val current = _bookmarkedAyahs.value.toMutableMap()
+        val existing = current[key]
+        if (existing != null) {
+            current[key] = existing.copy(note = note)
+        } else {
+            current[key] = BookmarkedAyah(
+                surahNumber = surahNumber,
+                ayahNumber = ayahNumber,
+                surahNamePersian = surahName,
+                textArabic = arabic,
+                textPersian = persian,
+                note = note
+            )
+        }
+        _bookmarkedAyahs.value = current
+        saveBookmarkedAyahs(current)
+    }
+
+    fun deleteAyahNote(surahNumber: Int, ayahNumber: Int) {
+        val key = "$surahNumber:$ayahNumber"
+        val current = _bookmarkedAyahs.value.toMutableMap()
+        val existing = current[key]
+        if (existing != null) {
+            current[key] = existing.copy(note = "")
+        }
+        _bookmarkedAyahs.value = current
+        saveBookmarkedAyahs(current)
+    }
+
+    fun removeBookmarkedAyah(surahNumber: Int, ayahNumber: Int) {
+        val key = "$surahNumber:$ayahNumber"
+        val current = _bookmarkedAyahs.value.toMutableMap()
+        current.remove(key)
+        _bookmarkedAyahs.value = current
+        saveBookmarkedAyahs(current)
     }
 
     fun loadSurahVerses(surahNumber: Int) {
@@ -277,7 +414,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         if (current != null && current.number == surah.number) {
             audioManager.togglePlayPause()
         } else {
-            audioManager.playSurah(surah)
+            playSurah(surah)
         }
     }
 
@@ -445,6 +582,46 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun saveLastRead(surahNumber: Int) {
         prefs.edit().putInt("last_read_surah", surahNumber).apply()
+    }
+
+    private fun loadReadingTheme(): ReadingTheme {
+        val saved = prefs.getString("reading_theme", ReadingTheme.DEFAULT.name) ?: ReadingTheme.DEFAULT.name
+        return try {
+            ReadingTheme.valueOf(saved)
+        } catch (e: Exception) {
+            ReadingTheme.DEFAULT
+        }
+    }
+
+    private fun loadBookmarkedAyahs(): Map<String, BookmarkedAyah> {
+        val bPrefs = getApplication<Application>().getSharedPreferences("quran_ayah_bookmarks_v1", Context.MODE_PRIVATE)
+        val all = bPrefs.all
+        val result = mutableMapOf<String, BookmarkedAyah>()
+        for ((key, value) in all) {
+            val str = value as? String ?: continue
+            val parts = str.split("::|::")
+            if (parts.size >= 7) {
+                val sNum = parts[0].toIntOrNull() ?: continue
+                val aNum = parts[1].toIntOrNull() ?: continue
+                val sName = parts[2]
+                val ar = parts[3]
+                val fa = parts[4]
+                val note = parts[5]
+                val time = parts[6].toLongOrNull() ?: System.currentTimeMillis()
+                result[key] = BookmarkedAyah(sNum, aNum, sName, ar, fa, note, time)
+            }
+        }
+        return result
+    }
+
+    private fun saveBookmarkedAyahs(map: Map<String, BookmarkedAyah>) {
+        val bPrefs = getApplication<Application>().getSharedPreferences("quran_ayah_bookmarks_v1", Context.MODE_PRIVATE)
+        val editor = bPrefs.edit().clear()
+        for ((key, item) in map) {
+            val serialized = "${item.surahNumber}::|::${item.ayahNumber}::|::${item.surahNamePersian}::|::${item.textArabic}::|::${item.textPersian}::|::${item.note}::|::${item.timestamp}"
+            editor.putString(key, serialized)
+        }
+        editor.apply()
     }
 
     override fun onCleared() {

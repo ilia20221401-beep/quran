@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -18,7 +19,11 @@ private val DarkColorScheme = darkColorScheme(
   secondary = DarkGoldSecondary,
   onSecondary = DarkGoldOnSecondary,
   secondaryContainer = DarkGoldSecondaryContainer,
-  onSecondaryContainer = DarkGoldSecondaryContainer,
+  onSecondaryContainer = DarkGoldOnSecondaryContainer,
+  tertiary = SageTertiary,
+  onTertiary = SageOnTertiary,
+  tertiaryContainer = Color(0xFF1B4D3E),
+  onTertiaryContainer = Color(0xFFD6F0E0),
   background = DarkBackground,
   onBackground = DarkOnSurface,
   surface = DarkSurface,
@@ -36,6 +41,10 @@ private val LightColorScheme = lightColorScheme(
   onSecondary = GoldOnSecondary,
   secondaryContainer = GoldSecondaryContainer,
   onSecondaryContainer = GoldOnSecondaryContainer,
+  tertiary = SageTertiary,
+  onTertiary = SageOnTertiary,
+  tertiaryContainer = SageTertiaryContainer,
+  onTertiaryContainer = SageOnTertiaryContainer,
   background = ParchmentBackground,
   onBackground = ParchmentOnSurface,
   surface = ParchmentSurface,

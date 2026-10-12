@@ -175,9 +175,9 @@ class QuranRepository(private val context: Context? = null) {
             }
         }
 
-        // Check disk cache if context available (using v7 cache for precise Istiadha/Basmalah synchronization)
+        // Check disk cache if context available (using v9 cache: Basmalah only for Surahs 2..114, Istiadha for Surah 1)
         context?.let { ctx ->
-            val prefs = ctx.getSharedPreferences("quran_timing_cache_v7", Context.MODE_PRIVATE)
+            val prefs = ctx.getSharedPreferences("quran_timing_cache_v9", Context.MODE_PRIVATE)
             val raw = prefs.getString(cacheKey, null)
             if (!raw.isNullOrEmpty()) {
                 val parsed = parseTimingsString(raw)
@@ -215,7 +215,7 @@ class QuranRepository(private val context: Context? = null) {
                         timingsMemoryCache[cacheKey] = processed
                         context?.let { ctx ->
                             val serialized = serializeTimingsString(processed)
-                            ctx.getSharedPreferences("quran_timing_cache_v7", Context.MODE_PRIVATE)
+                            ctx.getSharedPreferences("quran_timing_cache_v9", Context.MODE_PRIVATE)
                                 .edit().putString(cacheKey, serialized).apply()
                         }
                         return@withContext processed
@@ -232,16 +232,19 @@ class QuranRepository(private val context: Context? = null) {
             timingsMemoryCache[cacheKey] = estimated
             context?.let { ctx ->
                 val serialized = serializeTimingsString(estimated)
-                ctx.getSharedPreferences("quran_timing_cache_v7", Context.MODE_PRIVATE)
+                ctx.getSharedPreferences("quran_timing_cache_v9", Context.MODE_PRIVATE)
                     .edit().putString(cacheKey, serialized).apply()
             }
         }
         return@withContext estimated
     }
 
-    private fun getExpectedInitialAyah(surahNumber: Int): Int = when (surahNumber) {
-        1, 9 -> AYAH_ISTIADHA
-        else -> AYAH_BASMALAH
+    private fun getExpectedInitialAyah(surahNumber: Int): Int {
+        return when (surahNumber) {
+            1 -> AYAH_ISTIADHA
+            9 -> 1
+            else -> AYAH_BASMALAH
+        }
     }
 
     fun buildCompleteTimingsWithIntro(
@@ -275,21 +278,22 @@ class QuranRepository(private val context: Context? = null) {
             }
             9 -> {
                 // Surah At-Tawbah:
-                // No Basmalah! Only Isti'adha at start.
-                val effectiveIstiadha = if (diffMs in 2500L..12000L) diffMs else istiadhaMs
-                result.add(VerseTiming(AYAH_ISTIADHA, 0L, effectiveIstiadha))
-
+                // Revealed without Basmalah. Audio starts directly with Ayah 1 at 0ms.
                 rawTimings.forEach { raw ->
-                    val shiftedStart = effectiveIstiadha + raw.startMs
-                    val shiftedEnd = effectiveIstiadha + raw.endMs
-                    result.add(VerseTiming(raw.ayahNumber, shiftedStart, shiftedEnd))
+                    result.add(VerseTiming(raw.ayahNumber, raw.startMs, raw.endMs))
                 }
             }
             else -> {
                 // Surahs 2..8 and 10..114:
-                // Audio begins directly with Tasmiyah / Basmalah ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"),
-                // then Ayah 1. Reciters do NOT recite Isti'adha at the start of these surahs!
-                val effectiveBasmalah = if (diffMs in 2500L..12000L) diffMs else basmalahMs
+                // In standard audio recitations (e.g. Al-Hashr, Al-Baqarah, etc.),
+                // the reciter recites ONLY Tasmiyah / Basmalah ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ") at the beginning!
+                // No Isti'adha is recited in these surahs.
+                val effectiveBasmalah = if (diffMs in 3500L..10000L) {
+                    diffMs
+                } else {
+                    basmalahMs
+                }
+
                 result.add(VerseTiming(AYAH_BASMALAH, 0L, effectiveBasmalah))
 
                 rawTimings.forEach { raw ->
@@ -317,7 +321,7 @@ class QuranRepository(private val context: Context? = null) {
 
         when (surahNumber) {
             1 -> {
-                // Al-Fatiha: Ayah 1 is Basmalah.
+                // Al-Fatiha: Isti'adha, then Ayah 1 is Basmalah.
                 val effectiveDuration = if (totalDurationMs > (istiadhaMs + 5000L)) {
                     totalDurationMs
                 } else {
@@ -348,30 +352,27 @@ class QuranRepository(private val context: Context? = null) {
                 }
             }
             9 -> {
-                // At-Tawbah: No Basmalah, only Isti'adha
-                val effectiveDuration = if (totalDurationMs > (istiadhaMs + 5000L)) {
+                // At-Tawbah: Starts directly at Ayah 1 (No Basmalah, no Istiadha in audio)
+                val effectiveDuration = if (totalDurationMs > 5000L) {
                     totalDurationMs
                 } else {
-                    istiadhaMs + (ayahs.size * 5200L)
+                    ayahs.size * 5200L
                 }
 
-                result.add(VerseTiming(AYAH_ISTIADHA, 0L, istiadhaMs))
-
-                val remainingDuration = maxOf(effectiveDuration - istiadhaMs, ayahs.size * 2000L)
                 val weights = ayahs.map { ayah ->
                     val cleanText = ayah.textArabic.replace(" ", "")
                     maxOf(cleanText.length, 10).toLong()
                 }
                 val totalWeight = weights.sum().coerceAtLeast(1L)
 
-                var currentMs = istiadhaMs
+                var currentMs = 0L
                 ayahs.forEachIndexed { index, ayah ->
                     val start = currentMs
                     val end = if (index == ayahs.lastIndex) {
                         effectiveDuration
                     } else {
                         val frac = weights[index].toDouble() / totalWeight.toDouble()
-                        val dur = (remainingDuration * frac).toLong().coerceAtLeast(1500L)
+                        val dur = (effectiveDuration * frac).toLong().coerceAtLeast(1000L)
                         (start + dur).coerceAtMost(effectiveDuration)
                     }
                     currentMs = end
@@ -379,23 +380,24 @@ class QuranRepository(private val context: Context? = null) {
                 }
             }
             else -> {
-                // Surahs 2..8 and 10..114: Only Tasmiyah / Basmalah before Ayah 1 (NO Isti'adha)
-                val effectiveDuration = if (totalDurationMs > (basmalahMs + 5000L)) {
+                // Surahs 2..8 and 10..114: Reciter recites ONLY Basmalah before Ayah 1
+                val effectiveBasmalah = basmalahMs
+                val effectiveDuration = if (totalDurationMs > (effectiveBasmalah + 5000L)) {
                     totalDurationMs
                 } else {
-                    basmalahMs + (ayahs.size * 4500L)
+                    effectiveBasmalah + (ayahs.size * 4500L)
                 }
 
-                result.add(VerseTiming(AYAH_BASMALAH, 0L, basmalahMs))
+                result.add(VerseTiming(AYAH_BASMALAH, 0L, effectiveBasmalah))
 
-                val remainingDuration = maxOf(effectiveDuration - basmalahMs, ayahs.size * 2000L)
+                val remainingDuration = maxOf(effectiveDuration - effectiveBasmalah, ayahs.size * 2000L)
                 val weights = ayahs.map { ayah ->
                     val cleanText = ayah.textArabic.replace(" ", "")
                     maxOf(cleanText.length, 10).toLong()
                 }
                 val totalWeight = weights.sum().coerceAtLeast(1L)
 
-                var currentMs = basmalahMs
+                var currentMs = effectiveBasmalah
                 ayahs.forEachIndexed { index, ayah ->
                     val start = currentMs
                     val end = if (index == ayahs.lastIndex) {
