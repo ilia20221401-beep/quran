@@ -61,6 +61,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -74,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -81,11 +83,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.QuranAmiriFontFamily
+import com.example.ui.theme.VazirmatnFontFamily
 import com.example.audio.AudioPlayerState
 import com.example.data.model.AYAH_BASMALAH
 import com.example.data.model.AYAH_ISTIADHA
 import com.example.data.model.Ayah
 import com.example.data.model.Surah
+import com.example.data.remote.QuranRepository
 import com.example.ui.components.AyahNoteDialog
 import com.example.ui.components.TafsirBottomSheet
 import com.example.ui.viewmodel.ReadingTheme
@@ -100,6 +105,7 @@ fun SurahDetailScreen(
     isFavorite: Boolean,
     showTranslation: Boolean,
     arabicFontSize: Float,
+    isAutoFontScaling: Boolean = true,
     readingTheme: ReadingTheme = ReadingTheme.DEFAULT,
     targetAyahToScroll: Int? = null,
     onClearTargetAyahToScroll: () -> Unit = {},
@@ -114,10 +120,23 @@ fun SurahDetailScreen(
     onToggleFavorite: () -> Unit,
     onToggleTranslation: () -> Unit,
     onChangeFontSize: (Float) -> Unit,
+    onToggleAutoFontScaling: (Boolean) -> Unit = {},
     onSeekToAyah: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
+
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val autoScaledSize = remember(screenWidthDp) {
+        when {
+            screenWidthDp < 360 -> 21f
+            screenWidthDp < 400 -> 23f
+            screenWidthDp < 600 -> 25f
+            else -> 28f
+        }
+    }
+    val effectiveArabicFontSize = if (isAutoFontScaling) autoScaledSize else arabicFontSize
 
     var showFontSlider by remember { mutableStateOf(false) }
     var showThemeMenu by remember { mutableStateOf(false) }
@@ -323,34 +342,69 @@ fun SurahDetailScreen(
             }
         }
 
-        // Optional Font Size Slider Panel
+        // Font Size & Scaling Control Panel
         if (showFontSlider) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 2.dp
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        text = "اندازه خط:",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Slider(
-                        value = arabicFontSize,
-                        onValueChange = onChangeFontSize,
-                        valueRange = 18f..34f,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "${arabicFontSize.toInt()}sp",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    // Auto Font Scaling Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "تنظیم خودکار مقیاس خط (Auto Scaling)",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = if (isAutoFontScaling)
+                                    "اندازه هماهنگ با صفحه موبایل (${effectiveArabicFontSize.toInt()}sp)"
+                                else
+                                    "تنظیم دستی فعال است (${arabicFontSize.toInt()}sp)",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                        Switch(
+                            checked = isAutoFontScaling,
+                            onCheckedChange = onToggleAutoFontScaling
+                        )
+                    }
+
+                    if (!isAutoFontScaling) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "اندازه دستی:",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Slider(
+                                value = arabicFontSize,
+                                onValueChange = onChangeFontSize,
+                                valueRange = 16f..36f,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "${arabicFontSize.toInt()}sp",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -390,7 +444,7 @@ fun SurahDetailScreen(
                             IstiadhaCard(
                                 isHighlighted = isIstiadhaHighlighted,
                                 isPlaying = isPlayingThisSurah && isIstiadhaHighlighted,
-                                fontSize = arabicFontSize,
+                                fontSize = effectiveArabicFontSize,
                                 showTranslation = showTranslation,
                                 onPlay = { onSeekToAyah(AYAH_ISTIADHA) },
                                 modifier = Modifier
@@ -408,7 +462,7 @@ fun SurahDetailScreen(
                             BasmalahCard(
                                 isHighlighted = isBasmalahHighlighted,
                                 isPlaying = isPlayingThisSurah && isBasmalahHighlighted,
-                                fontSize = arabicFontSize,
+                                fontSize = effectiveArabicFontSize,
                                 showTranslation = showTranslation,
                                 onPlay = { onSeekToAyah(AYAH_BASMALAH) },
                                 modifier = Modifier
@@ -425,8 +479,9 @@ fun SurahDetailScreen(
 
                     AyahCard(
                         ayah = ayah,
+                        surahNumber = surah.number,
                         surahName = surah.namePersian,
-                        fontSize = arabicFontSize,
+                        fontSize = effectiveArabicFontSize,
                         showTranslation = showTranslation,
                         isHighlighted = isHighlighted,
                         isPlaying = isPlayingThisSurah && isHighlighted,
@@ -447,6 +502,7 @@ fun SurahDetailScreen(
 @Composable
 fun AyahCard(
     ayah: Ayah,
+    surahNumber: Int = 0,
     surahName: String,
     fontSize: Float,
     showTranslation: Boolean,
@@ -456,6 +512,13 @@ fun AyahCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val arabicText = remember(ayah.textArabic, surahNumber, ayah.numberInSurah) {
+        if (surahNumber != 1 && ayah.numberInSurah == 1) {
+            QuranRepository.stripBismillahPrefix(ayah.textArabic)
+        } else {
+            ayah.textArabic
+        }
+    }
 
     val cardBgColor by animateColorAsState(
         targetValue = if (isHighlighted) {
@@ -563,7 +626,7 @@ fun AyahCard(
                     IconButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Quran Ayah", "${ayah.textArabic}\n\n${ayah.textPersian}\n(سوره $surahName - آیه ${ayah.numberInSurah})")
+                            val clip = ClipData.newPlainText("Quran Ayah", "$arabicText\n\n${ayah.textPersian}\n(سوره $surahName - آیه ${ayah.numberInSurah})")
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, "آیه با موفقیت کپی شد", Toast.LENGTH_SHORT).show()
                         },
@@ -582,7 +645,7 @@ fun AyahCard(
                         onClick = {
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "${ayah.textArabic}\n\n${ayah.textPersian}\n(سوره $surahName - آیه ${ayah.numberInSurah})")
+                                putExtra(Intent.EXTRA_TEXT, "$arabicText\n\n${ayah.textPersian}\n(سوره $surahName - آیه ${ayah.numberInSurah})")
                                 type = "text/plain"
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "ارسال آیه"))
@@ -613,10 +676,11 @@ fun AyahCard(
 
             // Arabic Text with Highlight
             Text(
-                text = ayah.textArabic,
+                text = arabicText,
                 style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontSize = fontSize.sp,
-                    lineHeight = (fontSize * 1.85f).sp,
+                    lineHeight = (fontSize * 1.95f).sp,
                     fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 ),
@@ -626,6 +690,7 @@ fun AyahCard(
 
             // Persian Translation with Highlight
             if (showTranslation && ayah.textPersian.isNotEmpty()) {
+                val translationFontSize = (fontSize * 0.65f).coerceIn(13.5f, 18f)
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
@@ -636,8 +701,9 @@ fun AyahCard(
                 Text(
                     text = ayah.textPersian,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.5.sp,
-                        lineHeight = 22.sp,
+                        fontFamily = VazirmatnFontFamily,
+                        fontSize = translationFontSize.sp,
+                        lineHeight = (translationFontSize * 1.6f).sp,
                         color = if (isHighlighted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isHighlighted) FontWeight.Medium else FontWeight.Normal
                     ),
@@ -738,8 +804,10 @@ fun IstiadhaCard(
             Text(
                 text = "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ",
                 style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = fontSize.sp,
+                    lineHeight = (fontSize * 1.95f).sp,
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 ),
                 textAlign = TextAlign.Center,
@@ -851,8 +919,10 @@ fun BasmalahCard(
             Text(
                 text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
                 style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = (fontSize + 1f).sp,
+                    fontSize = (fontSize + 2f).sp,
+                    lineHeight = ((fontSize + 2f) * 1.95f).sp,
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
                 ),
                 textAlign = TextAlign.Center,

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AsmaName
 import com.example.data.model.AsmaUlHusnaData
+import com.example.ui.theme.QuranAmiriFontFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -201,7 +202,10 @@ private fun AsmaCard(
             Text(
                 text = name.arabic,
                 style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    lineHeight = 32.sp,
                     color = MaterialTheme.colorScheme.primary
                 ),
                 textAlign = TextAlign.Center
@@ -245,7 +249,10 @@ private fun AsmaDetailDialog(
                 Text(
                     text = name.arabic,
                     style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = QuranAmiriFontFamily,
                         fontWeight = FontWeight.Bold,
+                        fontSize = 30.sp,
+                        lineHeight = 44.sp,
                         color = MaterialTheme.colorScheme.primary
                     ),
                     textAlign = TextAlign.Center

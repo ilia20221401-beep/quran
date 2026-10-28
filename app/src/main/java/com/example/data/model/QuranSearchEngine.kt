@@ -1,5 +1,8 @@
 package com.example.data.model
 
+import android.content.Context
+import org.json.JSONArray
+
 data class SearchResultAyah(
     val surahNumber: Int,
     val ayahNumber: Int,
@@ -10,8 +13,11 @@ data class SearchResultAyah(
 )
 
 object QuranSearchEngine {
-    // Collect all pre-bundled and known Quranic verses
-    private val corpus: List<SearchResultAyah> by lazy {
+    private val fullCorpus = mutableListOf<SearchResultAyah>()
+    private var isFullLoaded = false
+
+    // Fallback mini corpus
+    private val fallbackCorpus: List<SearchResultAyah> by lazy {
         val list = mutableListOf<SearchResultAyah>()
 
         // 1. All offline verses from SurahDatabase
@@ -49,6 +55,47 @@ object QuranSearchEngine {
         list.distinctBy { "${it.surahNumber}:${it.ayahNumber}" }
     }
 
+    fun init(context: Context) {
+        if (isFullLoaded) return
+        try {
+            val list = mutableListOf<SearchResultAyah>()
+            for (surah in SurahDatabase.surahs) {
+                try {
+                    val stream = context.assets.open("quran/${surah.number}.json")
+                    val jsonStr = stream.bufferedReader().use { it.readText() }
+                    val array = JSONArray(jsonStr)
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        val numInSurah = obj.getInt("numberInSurah")
+                        val ar = obj.getString("textArabic")
+                        val fa = obj.getString("textPersian")
+                        list.add(
+                            SearchResultAyah(
+                                surahNumber = surah.number,
+                                ayahNumber = numInSurah,
+                                surahNamePersian = surah.namePersian,
+                                surahNameArabic = surah.nameArabic,
+                                textArabic = ar,
+                                textPersian = fa
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Ignored
+                }
+            }
+            if (list.isNotEmpty()) {
+                synchronized(fullCorpus) {
+                    fullCorpus.clear()
+                    fullCorpus.addAll(list)
+                    isFullLoaded = true
+                }
+            }
+        } catch (e: Exception) {
+            // Ignored
+        }
+    }
+
     fun search(query: String): List<SearchResultAyah> {
         val trimmed = query.trim()
         if (trimmed.length < 2) return emptyList()
@@ -62,7 +109,9 @@ object QuranSearchEngine {
             .replace("آ", "ا")
             .replace("[\u064B-\u065F]".toRegex(), "") // Remove Arabic diacritics for flexible search
 
-        return corpus.filter { item ->
+        val source = if (isFullLoaded && fullCorpus.isNotEmpty()) fullCorpus else fallbackCorpus
+
+        return source.filter { item ->
             val cleanArabic = item.textArabic
                 .replace("[\u064B-\u065F]".toRegex(), "")
                 .replace("ي", "ی")

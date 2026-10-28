@@ -11,6 +11,7 @@ import com.example.data.model.Ayah
 import com.example.data.model.BookmarkedAyah
 import com.example.data.model.DailyAyah
 import com.example.data.model.DailyAyahManager
+import com.example.data.model.QuranSearchEngine
 import com.example.data.model.Reciter
 import com.example.data.model.RecitersData
 import com.example.data.model.Surah
@@ -100,6 +101,9 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _arabicFontSize = MutableStateFlow(22f)
     val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
+
+    private val _isAutoFontScaling = MutableStateFlow(prefs.getBoolean("auto_font_scaling", true))
+    val isAutoFontScaling: StateFlow<Boolean> = _isAutoFontScaling.asStateFlow()
 
     // Reading Theme (Default, Night, Sepia)
     private val _readingTheme = MutableStateFlow(loadReadingTheme())
@@ -214,6 +218,10 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
                     audioManager.updateVerseTimings(timings)
                 }
             }
+        }
+        // Initialize QuranSearchEngine in background with full offline Quran corpus
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            QuranSearchEngine.init(application)
         }
         // Load initial surah verses
         loadSurahVerses(1)
@@ -487,6 +495,15 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setArabicFontSize(size: Float) {
         _arabicFontSize.value = size.coerceIn(16f, 36f)
+    }
+
+    fun setAutoFontScaling(enabled: Boolean) {
+        _isAutoFontScaling.value = enabled
+        prefs.edit().putBoolean("auto_font_scaling", enabled).apply()
+    }
+
+    fun toggleAutoFontScaling() {
+        setAutoFontScaling(!_isAutoFontScaling.value)
     }
 
     // Tasbih methods

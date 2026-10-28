@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.QuranSearchEngine
 import com.example.data.model.SearchResultAyah
+import com.example.ui.theme.QuranAmiriFontFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,8 +211,10 @@ private fun SearchResultItem(
             Text(
                 text = item.textArabic,
                 style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.SemiBold,
-                    lineHeight = 26.sp,
+                    fontSize = 17.sp,
+                    lineHeight = 30.sp,
                     textAlign = TextAlign.Right
                 ),
                 maxLines = 3,

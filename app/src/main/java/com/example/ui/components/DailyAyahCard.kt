@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.DailyAyah
+import com.example.ui.theme.QuranAmiriFontFamily
 
 @Composable
 fun DailyAyahCard(
@@ -114,8 +115,10 @@ fun DailyAyahCard(
             Text(
                 text = dailyAyah.textArabic,
                 style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
-                    lineHeight = 32.sp,
+                    fontSize = 19.sp,
+                    lineHeight = 36.sp,
                     textAlign = TextAlign.Right,
                     color = MaterialTheme.colorScheme.onSurface
                 ),

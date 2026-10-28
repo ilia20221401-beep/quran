@@ -110,4 +110,31 @@ class ExampleRobolectricTest {
     assertEquals(2, audioManager.calculateActiveAyah(timings[2].startMs + 100L))
     assertEquals(3, audioManager.calculateActiveAyah(timings[3].startMs + 100L))
   }
+
+  @Test
+  fun `verify offline Surah loading and Bismillah stripping`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val repo = com.example.data.remote.QuranRepository(context)
+
+    // Test stripBismillahPrefix
+    val sampleWithPrefix = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ قُلْ هُوَ ٱللَّهُ أَحَدٌ"
+    val stripped = com.example.data.remote.QuranRepository.stripBismillahPrefix(sampleWithPrefix)
+    assertEquals("قُلْ هُوَ ٱللَّهُ أَحَدٌ", stripped)
+
+    // Test offline assets loading for Surah 112 (Ikhlas)
+    val ikhlasVerses = repo.loadSurahFromAssets(112)
+    assertNotNull(ikhlasVerses)
+    assertEquals(4, ikhlasVerses?.size)
+    // Ayah 1 of Surah 112 should NOT contain Bismillah
+    val ikhlasAyah1 = ikhlasVerses?.firstOrNull()?.textArabic
+    assertEquals("قُلْ هُوَ ٱللَّهُ أَحَدٌ", ikhlasAyah1)
+
+    // Test offline assets loading for Surah 1 (Fatiha)
+    val fatihaVerses = repo.loadSurahFromAssets(1)
+    assertNotNull(fatihaVerses)
+    assertEquals(7, fatihaVerses?.size)
+    // Ayah 1 of Fatiha IS Bismillah
+    val fatihaAyah1 = fatihaVerses?.firstOrNull()?.textArabic
+    assertEquals("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", fatihaAyah1)
+  }
 }

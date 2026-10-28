@@ -50,6 +50,7 @@ import com.example.data.model.QuranicDua
 import com.example.data.model.QuranicDuasData
 import com.example.data.model.Surah
 import com.example.data.model.SurahDatabase
+import com.example.ui.theme.QuranAmiriFontFamily
 
 @Composable
 fun DuaScreen(
@@ -147,9 +148,10 @@ fun DuaScreen(
                     Text(
                         text = kursi.arabic,
                         style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            lineHeight = 36.sp,
+                            fontSize = 21.sp,
+                            lineHeight = 38.sp,
                             color = MaterialTheme.colorScheme.primary
                         ),
                         textAlign = TextAlign.Right
@@ -285,9 +287,10 @@ fun DuaScreen(
                     Text(
                         text = dua.arabic,
                         style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 18.sp,
-                            lineHeight = 30.sp,
+                            fontSize = 19.sp,
+                            lineHeight = 34.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         textAlign = TextAlign.Right

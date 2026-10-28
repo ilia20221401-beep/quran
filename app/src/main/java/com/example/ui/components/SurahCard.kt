@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Surah
+import com.example.ui.theme.QuranAmiriFontFamily
 
 @Composable
 fun SurahCard(
@@ -144,8 +145,9 @@ fun SurahCard(
                     Text(
                         text = surah.nameArabic,
                         style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
+                            fontSize = 19.sp,
                             color = MaterialTheme.colorScheme.primary
                         ),
                         textAlign = TextAlign.End

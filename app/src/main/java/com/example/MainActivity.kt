@@ -57,8 +57,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuranAppTheme {
-                // Apply Right-To-Left layout direction for natural Arabic/Persian reading experience
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                val currentDensity = androidx.compose.ui.platform.LocalDensity.current
+                // Auto Font Scaling at density level to prevent extreme font distortion while respecting mobile screens
+                val responsiveDensity = androidx.compose.runtime.remember(currentDensity) {
+                    androidx.compose.ui.unit.Density(
+                        density = currentDensity.density,
+                        fontScale = currentDensity.fontScale.coerceIn(0.85f, 1.15f)
+                    )
+                }
+                // Apply Right-To-Left layout direction and Auto Font Scaling
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    androidx.compose.ui.platform.LocalDensity provides responsiveDensity
+                ) {
                     QuranAppMain(viewModel = viewModel)
                 }
             }
@@ -81,6 +92,7 @@ fun QuranAppMain(viewModel: QuranViewModel) {
     val isLoadingVerses by viewModel.isLoadingVerses.collectAsStateWithLifecycle()
     val showTranslation by viewModel.showTranslation.collectAsStateWithLifecycle()
     val arabicFontSize by viewModel.arabicFontSize.collectAsStateWithLifecycle()
+    val isAutoFontScaling by viewModel.isAutoFontScaling.collectAsStateWithLifecycle()
 
     val showReciterSheet by viewModel.showReciterSheet.collectAsStateWithLifecycle()
     val showFullPlayerDialog by viewModel.showFullPlayerDialog.collectAsStateWithLifecycle()
@@ -328,6 +340,8 @@ fun QuranAppMain(viewModel: QuranViewModel) {
                             onToggleFavorite = { viewModel.toggleFavorite(surahToRead.number) },
                             onToggleTranslation = { viewModel.toggleShowTranslation() },
                             onChangeFontSize = { viewModel.setArabicFontSize(it) },
+                            isAutoFontScaling = isAutoFontScaling,
+                            onToggleAutoFontScaling = { viewModel.toggleAutoFontScaling() },
                             onSeekToAyah = { viewModel.seekToAyah(it) }
                         )
                     }

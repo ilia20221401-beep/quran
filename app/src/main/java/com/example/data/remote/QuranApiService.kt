@@ -92,20 +92,91 @@ class QuranRepository(private val context: Context? = null) {
         .build()
         .create(QuranTimingsApiService::class.java)
 
+    companion object {
+        fun stripBismillahPrefix(text: String): String {
+            var s = text.trim()
+            if (s.startsWith("\ufeff")) {
+                s = s.substring(1).trim()
+            }
+            val prefixes = listOf(
+                "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
+                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                "بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ",
+                "بِسْمِ اللَّهِ الرَّحْمٰنِ الرَّحِيمِ",
+                "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ",
+                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                "بسم الله الرحمن الرحيم"
+            )
+            for (prefix in prefixes) {
+                if (s.startsWith(prefix)) {
+                    val stripped = s.removePrefix(prefix).trim()
+                    if (stripped.isNotEmpty()) {
+                        return stripped
+                    }
+                }
+            }
+            return s
+        }
+    }
+
     // In-memory cache for loaded surahs
     private val versesCache = mutableMapOf<Int, List<Ayah>>()
     private val timingsMemoryCache = mutableMapOf<String, List<VerseTiming>>()
 
+    fun loadSurahFromAssets(surahNumber: Int): List<Ayah>? {
+        val ctx = context ?: return null
+        return try {
+            val inputStream = ctx.assets.open("quran/$surahNumber.json")
+            val jsonString = inputStream.bufferedReader().use { it.readText() }
+            val jsonArray = org.json.JSONArray(jsonString)
+            val list = ArrayList<Ayah>(jsonArray.length())
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val numInSurah = obj.getInt("numberInSurah")
+                var arabic = obj.getString("textArabic")
+                val persian = obj.getString("textPersian")
+
+                if (surahNumber != 1 && numInSurah == 1) {
+                    arabic = stripBismillahPrefix(arabic)
+                }
+
+                list.add(
+                    Ayah(
+                        numberInSurah = numInSurah,
+                        textArabic = arabic,
+                        textPersian = persian
+                    )
+                )
+            }
+            list
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun getSurahVerses(surahNumber: Int): List<Ayah> = withContext(Dispatchers.IO) {
-        // Check cache first
+        // 1. Check in-memory cache first
         versesCache[surahNumber]?.let { return@withContext it }
 
-        // Check pre-bundled local data
-        SurahDatabase.offlineVersesMap[surahNumber]?.let {
-            versesCache[surahNumber] = it
-            return@withContext it
+        // 2. Load from bundled local assets (Complete offline Quran for all 114 Surahs)
+        val assetVerses = loadSurahFromAssets(surahNumber)
+        if (!assetVerses.isNullOrEmpty()) {
+            versesCache[surahNumber] = assetVerses
+            return@withContext assetVerses
         }
 
+        // 3. Check pre-bundled local data in SurahDatabase
+        SurahDatabase.offlineVersesMap[surahNumber]?.let { list ->
+            val sanitized = list.map { ayah ->
+                if (surahNumber != 1 && ayah.numberInSurah == 1) {
+                    ayah.copy(textArabic = stripBismillahPrefix(ayah.textArabic))
+                } else ayah
+            }
+            versesCache[surahNumber] = sanitized
+            return@withContext sanitized
+        }
+
+        // 4. Try network API if available
         try {
             val response = api.getSurahVerses(surahNumber)
             val editions = response.data
@@ -117,13 +188,12 @@ class QuranRepository(private val context: Context? = null) {
                 for (i in arabicEdition.indices) {
                     val ar = arabicEdition[i]
                     val fa = persianEdition.getOrNull(i)?.text ?: ""
-                    // Clean up Bismillah in first ayah if repeated (except Fatiha)
-                    var arabicText = ar.text
-                    if (surahNumber != 1 && ar.numberInSurah == 1 && arabicText.startsWith("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ")) {
-                        arabicText = arabicText.removePrefix("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ").trim()
-                        if (arabicText.isEmpty()) {
-                            arabicText = ar.text
-                        }
+                    var arabicText = ar.text.trim()
+                    if (arabicText.startsWith("\ufeff")) {
+                        arabicText = arabicText.substring(1).trim()
+                    }
+                    if (surahNumber != 1 && ar.numberInSurah == 1) {
+                        arabicText = stripBismillahPrefix(arabicText)
                     }
 
                     merged.add(
@@ -141,24 +211,25 @@ class QuranRepository(private val context: Context? = null) {
                 }
             }
         } catch (e: Exception) {
-            // Silently fall back to placeholder if offline and not in bundled set
+            // Silently fall back if offline and asset not found
         }
 
-        // Fallback for surahs without internet and not bundled:
+        // 5. Ultimate fallback (never duplicate Bismillah)
         val surahInfo = SurahDatabase.getSurah(surahNumber)
-        val placeholder = listOf(
+        val fallbackAyah1 = if (surahNumber == 1) {
             Ayah(
                 numberInSurah = 1,
-                textArabic = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                textArabic = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
                 textPersian = "به نام خداوند بخشنده مهربان"
-            ),
-            Ayah(
-                numberInSurah = 2,
-                textArabic = "${surahInfo?.nameArabic ?: ""} - ${surahInfo?.numberOfAyahs ?: 0} آیه",
-                textPersian = "برای مشاهده متن کامل تمامی آیات به صورت آنلاین متصل شوید. تلاوت صوتی این سوره بدون مشکل آماده پخش است."
             )
-        )
-        return@withContext placeholder
+        } else {
+            Ayah(
+                numberInSurah = 1,
+                textArabic = surahInfo?.nameArabic ?: "",
+                textPersian = surahInfo?.meaningPersian ?: ""
+            )
+        }
+        return@withContext listOf(fallbackAyah1)
     }
 
     suspend fun getVerseTimings(

@@ -68,6 +68,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.Ayah
 import com.example.data.model.Surah
 import com.example.data.model.SurahDatabase
+import com.example.ui.theme.QuranAmiriFontFamily
+import com.example.ui.theme.VazirmatnFontFamily
 import com.example.ui.viewmodel.DhikrMode
 import com.example.ui.viewmodel.DhikrPreset
 
@@ -310,10 +312,11 @@ fun DhikrCounterScreen(
                                 Text(
                                     text = targetAyah.textArabic,
                                     style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontFamily = QuranAmiriFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 22.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 36.sp
+                                        lineHeight = 40.sp
                                     ),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth()
