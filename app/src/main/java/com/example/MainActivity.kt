@@ -37,12 +37,21 @@ import com.example.ui.components.AudioPlayerDialog
 import com.example.ui.components.FullQuranSearchDialog
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.ReciterSelectorSheet
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.example.ui.screens.AboutScreen
 import com.example.ui.screens.AsmaUlHusnaScreen
 import com.example.ui.screens.DhikrCounterScreen
 import com.example.ui.screens.DuaScreen
 import com.example.ui.screens.FavoritesScreen
 import com.example.ui.screens.PrayerTimesScreen
+import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.SurahDetailScreen
 import com.example.ui.screens.SurahListScreen
 import com.example.ui.theme.QuranAppTheme
@@ -70,7 +79,24 @@ class MainActivity : ComponentActivity() {
                     LocalLayoutDirection provides LayoutDirection.Rtl,
                     androidx.compose.ui.platform.LocalDensity provides responsiveDensity
                 ) {
-                    QuranAppMain(viewModel = viewModel)
+                    var isSplashActive by rememberSaveable { mutableStateOf(true) }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        QuranAppMain(
+                            viewModel = viewModel,
+                            onShowSplash = { isSplashActive = true }
+                        )
+
+                        AnimatedVisibility(
+                            visible = isSplashActive,
+                            enter = fadeIn(tween(300)),
+                            exit = fadeOut(tween(550)) + scaleOut(targetScale = 1.05f, animationSpec = tween(550))
+                        ) {
+                            SplashScreen(
+                                onFinished = { isSplashActive = false }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -78,7 +104,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun QuranAppMain(viewModel: QuranViewModel) {
+fun QuranAppMain(
+    viewModel: QuranViewModel,
+    onShowSplash: () -> Unit = {}
+) {
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val playerState by viewModel.playerState.collectAsStateWithLifecycle()
     val filteredSurahs by viewModel.filteredSurahs.collectAsStateWithLifecycle()
@@ -405,7 +434,8 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
                 QuranTab.ABOUT -> {
                     AboutScreen(
-                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
+                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) },
+                        onShowSplash = onShowSplash
                     )
                 }
             }
