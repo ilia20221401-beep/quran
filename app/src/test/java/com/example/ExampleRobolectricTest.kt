@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import androidx.activity.compose.setContent
 import androidx.test.core.app.ApplicationProvider
 import com.example.audio.QuranAudioCacheManager
 import com.example.data.model.JuzDatabase
@@ -23,6 +24,11 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
     assertEquals("قرآن کریم", appName)
+
+    val banner = context.getDrawable(R.drawable.quran_hero_banner_1791396872226)
+    assertNotNull(banner)
+    val icon = context.getDrawable(R.drawable.ic_quran_icon_1791396858896)
+    assertNotNull(icon)
   }
 
   @Test
@@ -136,5 +142,16 @@ class ExampleRobolectricTest {
     // Ayah 1 of Fatiha IS Bismillah
     val fatihaAyah1 = fatihaVerses?.firstOrNull()?.textArabic
     assertEquals("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", fatihaAyah1)
+  }
+
+  @Test
+  fun `verify QuranAppMain renders without crash`() {
+    val activity = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup().get()
+    val viewModel = androidx.lifecycle.ViewModelProvider(activity)[com.example.ui.viewmodel.QuranViewModel::class.java]
+    activity.setContent {
+      com.example.ui.theme.QuranAppTheme {
+        com.example.QuranAppMain(viewModel = viewModel)
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -10,15 +10,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -44,9 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,48 +50,74 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
-import com.example.ui.theme.DarkEmeraldPrimary
-import com.example.ui.theme.DarkGoldSecondary
-import com.example.ui.theme.GoldSecondary
 import com.example.ui.theme.GoldenStar
 import com.example.ui.theme.QuranAmiriFontFamily
 import com.example.ui.theme.VazirmatnFontFamily
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
+
+private val StarCoordinates = listOf(
+    Offset(0.12f, 0.15f) to 2.2f,
+    Offset(0.85f, 0.18f) to 3.0f,
+    Offset(0.25f, 0.32f) to 1.8f,
+    Offset(0.78f, 0.38f) to 2.4f,
+    Offset(0.08f, 0.55f) to 1.6f,
+    Offset(0.92f, 0.60f) to 2.8f,
+    Offset(0.18f, 0.75f) to 2.5f,
+    Offset(0.82f, 0.82f) to 1.9f,
+    Offset(0.50f, 0.10f) to 2.0f,
+    Offset(0.35f, 0.88f) to 2.2f
+)
 
 @Composable
 fun SplashScreen(
     onFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var isFinishedCalled by remember { mutableStateOf(false) }
+
+    // Screen-level fade out animator
+    val screenAlpha = remember { Animatable(1f) }
+
+    val safeFinish: () -> Unit = {
+        if (!isFinishedCalled) {
+            isFinishedCalled = true
+            coroutineScope.launch {
+                screenAlpha.animateTo(0f, tween(250))
+                onFinished()
+            }
+        }
+    }
+
+    // Allow user to press back to immediately enter the app
+    BackHandler(enabled = !isFinishedCalled) { safeFinish() }
+
     // Stage-based animation controllers
-    val logoScale = remember { Animatable(0.2f) }
+    val logoScale = remember { Animatable(0.3f) }
     val logoAlpha = remember { Animatable(0f) }
     val titleAlpha = remember { Animatable(0f) }
-    val titleTranslation = remember { Animatable(30f) }
+    val titleTranslation = remember { Animatable(20f) }
     val basmalahAlpha = remember { Animatable(0f) }
     val verseCardAlpha = remember { Animatable(0f) }
     val progressAlpha = remember { Animatable(0f) }
-    var progressVal by remember { mutableFloatStateOf(0f) }
+    val progressVal = remember { Animatable(0f) }
 
-    // Infinite ambient rotations and breathing glow
+    // Smooth ambient transitions
     val infiniteTransition = rememberInfiniteTransition(label = "splash_ambient")
     val mandalaRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -117,7 +138,7 @@ fun SplashScreen(
         label = "counter_rotation"
     )
     val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.55f,
+        initialValue = 0.65f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(2200, easing = FastOutSlowInEasing),
@@ -126,8 +147,8 @@ fun SplashScreen(
         label = "glow_pulse"
     )
     val emblemFloat by infiniteTransition.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
+        initialValue = -4f,
+        targetValue = 4f,
         animationSpec = infiniteRepeatable(
             animation = tween(2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -135,58 +156,72 @@ fun SplashScreen(
         label = "emblem_float"
     )
 
-    // Coordinated entrance sequence
+    // Snappy, non-blocking concurrent entrance sequence (total ~1.8 seconds)
     LaunchedEffect(Unit) {
-        // Stage 1: Central Emblem entrance with gentle spring bounce
-        logoAlpha.animateTo(1f, tween(600))
-        logoScale.animateTo(
-            1f,
-            spring(dampingRatio = 0.65f, stiffness = 180f)
-        )
-
-        // Stage 2: Bismillah calligraphy smooth fade-in
-        basmalahAlpha.animateTo(1f, tween(700))
-
-        // Stage 3: Title and Subtitle rise up
-        titleAlpha.animateTo(1f, tween(600))
-        titleTranslation.animateTo(0f, spring(dampingRatio = 0.75f, stiffness = 220f))
-
-        // Stage 4: Verse of Light card
-        verseCardAlpha.animateTo(1f, tween(600))
-
-        // Stage 5: Progress bar loading
-        progressAlpha.animateTo(1f, tween(400))
-        
-        // Progress filling up to completion
-        val steps = 25
-        for (i in 1..steps) {
-            progressVal = i / steps.toFloat()
-            delay(40)
+        // Stage 1: Central Emblem entrance
+        launch {
+            logoAlpha.animateTo(1f, tween(350))
         }
-        delay(350)
-        onFinished()
+        launch {
+            logoScale.animateTo(1f, spring(dampingRatio = 0.65f, stiffness = 260f))
+        }
+
+        delay(100)
+        // Stage 2: Bismillah calligraphy smooth fade-in
+        launch {
+            basmalahAlpha.animateTo(1f, tween(400))
+        }
+
+        delay(100)
+        // Stage 3: Title and Subtitle rise up
+        launch {
+            titleAlpha.animateTo(1f, tween(400))
+            titleTranslation.animateTo(0f, spring(dampingRatio = 0.75f, stiffness = 280f))
+        }
+
+        delay(100)
+        // Stage 4: Spiritual Verse of Light card
+        launch {
+            verseCardAlpha.animateTo(1f, tween(400))
+        }
+
+        delay(80)
+        // Stage 5: Progress bar loading
+        launch {
+            progressAlpha.animateTo(1f, tween(250))
+        }
+
+        // Progress bar smoothly fills up over 1100ms
+        progressVal.animateTo(1f, tween(1100, easing = LinearEasing))
+        delay(150)
+        safeFinish()
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
+            .alpha(screenAlpha.value)
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF0F3A2A), // Luminous deep Islamic Emerald
-                        Color(0xFF092017), // Midnight Forest
-                        Color(0xFF04100B)  // Obsidian Sanctuary
+                        Color(0xFF0F3A2A), // Deep Emerald
+                        Color(0xFF092017), // Forest Sanctuary
+                        Color(0xFF04100B)  // Obsidian Night
                     ),
                     radius = 1600f
                 )
             )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { safeFinish() }
             .testTag("splash_screen_root"),
         contentAlignment = Alignment.Center
     ) {
-        // Background Stars & Sparkle Canvas
+        // Background Stars & Sparkle Canvas (zero-allocation)
         TwinklingStarsCanvas(glowPulse = glowPulse)
 
-        // Sacred Islamic Geometric Rosette & Mandala (Rotating canvas)
+        // Sacred Islamic Geometric Rosette & Mandala (zero-allocation)
         IslamicMandalaCanvas(
             rotationAngle = mandalaRotation,
             counterAngle = counterRotation,
@@ -200,9 +235,9 @@ fun SplashScreen(
                 .align(Alignment.TopEnd)
                 .padding(top = 48.dp, end = 20.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .clickable { onFinished() }
+                .clickable { safeFinish() }
                 .testTag("splash_skip_button"),
-            color = Color.White.copy(alpha = 0.12f),
+            color = Color.White.copy(alpha = 0.14f),
             shape = RoundedCornerShape(20.dp)
         ) {
             Row(
@@ -213,7 +248,7 @@ fun SplashScreen(
                     text = "ورود به برنامه",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = VazirmatnFontFamily,
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = Color.White.copy(alpha = 0.95f),
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -238,7 +273,7 @@ fun SplashScreen(
             // Radiant Emblem & Holy Book
             Box(
                 modifier = Modifier
-                    .size(150.dp)
+                    .size(140.dp)
                     .scale(logoScale.value)
                     .alpha(logoAlpha.value),
                 contentAlignment = Alignment.Center
@@ -251,7 +286,7 @@ fun SplashScreen(
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 GoldenStar.copy(alpha = 0.35f * glowPulse),
-                                Color(0xFF145A3E).copy(alpha = 0.15f),
+                                Color(0xFF145A3E).copy(alpha = 0.12f),
                                 Color.Transparent
                             )
                         ),
@@ -277,11 +312,11 @@ fun SplashScreen(
                 // Inner medallion circle
                 Surface(
                     modifier = Modifier
-                        .size(112.dp)
+                        .size(105.dp)
                         .clip(CircleShape)
                         .border(2.5.dp, Brush.linearGradient(listOf(GoldenStar, Color(0xFFB8860B))), CircleShape),
                     color = Color(0xFF0F2E21),
-                    shadowElevation = 12.dp
+                    shadowElevation = 10.dp
                 ) {
                     Box(
                         modifier = Modifier
@@ -302,14 +337,14 @@ fun SplashScreen(
                             contentDescription = "قرآن کریم",
                             tint = GoldenStar,
                             modifier = Modifier
-                                .size(58.dp)
+                                .size(54.dp)
                                 .rotate(emblemFloat)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
             // Bismillah Calligraphy (Amiri Quran font)
             Text(
@@ -361,7 +396,7 @@ fun SplashScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Spiritual Verse Card
             Surface(
@@ -411,7 +446,7 @@ fun SplashScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(30.dp))
 
             // Smooth golden progress bar & status
             Column(
@@ -421,9 +456,9 @@ fun SplashScreen(
                     .alpha(progressAlpha.value)
             ) {
                 LinearProgressIndicator(
-                    progress = { progressVal },
+                    progress = { progressVal.value },
                     modifier = Modifier
-                        .width(170.dp)
+                        .width(160.dp)
                         .height(3.5.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = GoldenStar,
@@ -459,7 +494,7 @@ fun SplashScreen(
 }
 
 /**
- * Draws the rotating 8-pointed Islamic Star (Khatam Sulayman) and rosette patterns.
+ * Draws the rotating 8-pointed Islamic Star (Khatam Sulayman) using pure GPU primitives without GC allocations.
  */
 @Composable
 private fun IslamicMandalaCanvas(
@@ -505,29 +540,27 @@ private fun IslamicMandalaCanvas(
             )
         }
 
-        // Draw primary rotating 8-pointed Islamic Star
+        // Draw primary rotating 8-pointed Islamic Star with drawRect (Zero allocations)
         rotate(rotationAngle, center) {
-            val starSize = innerRadius * 0.85f
+            val starSize = innerRadius * 0.82f
+            val squareWidth = starSize * 2f
+            val topLeft = Offset(center.x - starSize, center.y - starSize)
+            val rectSize = Size(squareWidth, squareWidth)
 
             // First square
-            val path1 = Path().apply {
-                moveTo(center.x - starSize, center.y - starSize)
-                lineTo(center.x + starSize, center.y - starSize)
-                lineTo(center.x + starSize, center.y + starSize)
-                lineTo(center.x - starSize, center.y + starSize)
-                close()
-            }
-            drawPath(
-                path = path1,
-                color = GoldenStar.copy(alpha = 0.18f * glowPulse),
+            drawRect(
+                color = GoldenStar.copy(alpha = 0.20f * glowPulse),
+                topLeft = topLeft,
+                size = rectSize,
                 style = Stroke(width = 1.4.dp.toPx())
             )
 
             // Second square rotated 45 degrees
             rotate(45f, center) {
-                drawPath(
-                    path = path1,
-                    color = GoldenStar.copy(alpha = 0.18f * glowPulse),
+                drawRect(
+                    color = GoldenStar.copy(alpha = 0.20f * glowPulse),
+                    topLeft = topLeft,
+                    size = rectSize,
                     style = Stroke(width = 1.4.dp.toPx())
                 )
             }
@@ -551,20 +584,7 @@ private fun TwinklingStarsCanvas(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
-        val starCoords = listOf(
-            Offset(0.12f, 0.15f) to 2.2f,
-            Offset(0.85f, 0.18f) to 3.0f,
-            Offset(0.25f, 0.32f) to 1.8f,
-            Offset(0.78f, 0.38f) to 2.4f,
-            Offset(0.08f, 0.55f) to 1.6f,
-            Offset(0.92f, 0.60f) to 2.8f,
-            Offset(0.18f, 0.75f) to 2.5f,
-            Offset(0.82f, 0.82f) to 1.9f,
-            Offset(0.50f, 0.10f) to 2.0f,
-            Offset(0.35f, 0.88f) to 2.2f
-        )
-
-        starCoords.forEachIndexed { index, (coord, sizeRadius) ->
+        StarCoordinates.forEachIndexed { index, (coord, sizeRadius) ->
             val actualPos = Offset(coord.x * size.width, coord.y * size.height)
             val alphaMultiplier = if (index % 2 == 0) glowPulse else (1.55f - glowPulse)
             drawCircle(

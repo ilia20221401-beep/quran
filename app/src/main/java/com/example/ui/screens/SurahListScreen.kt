@@ -120,6 +120,15 @@ fun SurahListScreen(
                     .fillMaxWidth()
                     .height(180.dp)
                     .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFF0F3A2A),
+                                MaterialTheme.colorScheme.primary,
+                                Color(0xFF092017)
+                            )
+                        )
+                    )
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.quran_hero_banner_1791396872226),

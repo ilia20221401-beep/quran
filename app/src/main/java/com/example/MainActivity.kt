@@ -37,7 +37,9 @@ import com.example.ui.components.AudioPlayerDialog
 import com.example.ui.components.FullQuranSearchDialog
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.ReciterSelectorSheet
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,36 +68,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuranAppTheme {
-                val currentDensity = androidx.compose.ui.platform.LocalDensity.current
-                // Auto Font Scaling at density level to prevent extreme font distortion while respecting mobile screens
-                val responsiveDensity = androidx.compose.runtime.remember(currentDensity) {
-                    androidx.compose.ui.unit.Density(
-                        density = currentDensity.density,
-                        fontScale = currentDensity.fontScale.coerceIn(0.85f, 1.15f)
-                    )
-                }
-                // Apply Right-To-Left layout direction and Auto Font Scaling
-                CompositionLocalProvider(
-                    LocalLayoutDirection provides LayoutDirection.Rtl,
-                    androidx.compose.ui.platform.LocalDensity provides responsiveDensity
-                ) {
+                // Apply Right-To-Left layout direction
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     var isSplashActive by rememberSaveable { mutableStateOf(true) }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    if (isSplashActive) {
+                        SplashScreen(
+                            onFinished = { isSplashActive = false }
+                        )
+                    } else {
                         QuranAppMain(
                             viewModel = viewModel,
                             onShowSplash = { isSplashActive = true }
                         )
-
-                        AnimatedVisibility(
-                            visible = isSplashActive,
-                            enter = fadeIn(tween(300)),
-                            exit = fadeOut(tween(550)) + scaleOut(targetScale = 1.05f, animationSpec = tween(550))
-                        ) {
-                            SplashScreen(
-                                onFinished = { isSplashActive = false }
-                            )
-                        }
                     }
                 }
             }
