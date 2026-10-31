@@ -130,10 +130,10 @@ fun SurahDetailScreen(
     val screenWidthDp = configuration.screenWidthDp
     val autoScaledSize = remember(screenWidthDp) {
         when {
-            screenWidthDp < 360 -> 21f
-            screenWidthDp < 400 -> 23f
-            screenWidthDp < 600 -> 25f
-            else -> 28f
+            screenWidthDp < 360 -> 17f
+            screenWidthDp < 400 -> 18.5f
+            screenWidthDp < 600 -> 20f
+            else -> 22f
         }
     }
     val effectiveArabicFontSize = if (isAutoFontScaling) autoScaledSize else arabicFontSize
@@ -690,7 +690,7 @@ fun AyahCard(
 
             // Persian Translation with Highlight
             if (showTranslation && ayah.textPersian.isNotEmpty()) {
-                val translationFontSize = (fontSize * 0.65f).coerceIn(13.5f, 18f)
+                val translationFontSize = (fontSize * 0.65f).coerceIn(12f, 15f)
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
@@ -921,8 +921,8 @@ fun BasmalahCard(
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = (fontSize + 2f).sp,
-                    lineHeight = ((fontSize + 2f) * 1.95f).sp,
+                    fontSize = fontSize.sp,
+                    lineHeight = (fontSize * 1.95f).sp,
                     color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
                 ),
                 textAlign = TextAlign.Center,

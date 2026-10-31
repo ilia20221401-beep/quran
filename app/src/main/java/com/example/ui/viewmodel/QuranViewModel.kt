@@ -56,7 +56,26 @@ enum class DhikrMode {
     GENERAL_DHIKR
 }
 
-data class DhikrPreset(val title: String, val meaning: String, val defaultTarget: Int)
+data class DhikrPreset(
+    val title: String,
+    val arabicText: String,
+    val meaning: String,
+    val defaultTarget: Int
+)
+
+fun getTodayDhikrPreset(): DhikrPreset {
+    val calendar = java.util.Calendar.getInstance()
+    return when (calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
+        java.util.Calendar.SATURDAY -> DhikrPreset("ذکر شنبه", "يَا رَبَّ الْعَالَمِينَ", "ای پروردگار جهانیان", 100)
+        java.util.Calendar.SUNDAY -> DhikrPreset("ذکر یکشنبه", "يَا ذَا الْجَلَالِ وَ الْإِكْرَامِ", "ای صاحب شکوه و بزرگواری", 100)
+        java.util.Calendar.MONDAY -> DhikrPreset("ذکر دوشنبه", "يَا قَاضِيَ الْحَاجَاتِ", "ای برآورنده حاجت‌ها", 100)
+        java.util.Calendar.TUESDAY -> DhikrPreset("ذکر سه‌شنبه", "يَا أَرْحَمَ الرَّاحِمِينَ", "ای مهربان‌ترین مهربانان", 100)
+        java.util.Calendar.WEDNESDAY -> DhikrPreset("ذکر چهارشنبه", "يَا حَيُّ يَا قَيُّومُ", "ای زنده و پاینده", 100)
+        java.util.Calendar.THURSDAY -> DhikrPreset("ذکر پنج‌شنبه", "لَا إِلٰهَ إِلَّا اللَّهُ الْمَلِكُ الْحَقُّ الْمُبِينُ", "معبودی جز خدای یگانه و آشکار نیست", 100)
+        java.util.Calendar.FRIDAY -> DhikrPreset("ذکر جمعه", "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَ آلِ مُحَمَّد وَ عَجِّلْ فَرَجَهُمْ", "خدایا بر محمد و آل محمد درود فرست و در فرجشان تعجیل فرما", 100)
+        else -> DhikrPreset("ذکر روز", "يَا رَبَّ الْعَالَمِينَ", "ای پروردگار جهانیان", 100)
+    }
+}
 
 class QuranViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
@@ -99,7 +118,7 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     private val _showTranslation = MutableStateFlow(true)
     val showTranslation: StateFlow<Boolean> = _showTranslation.asStateFlow()
 
-    private val _arabicFontSize = MutableStateFlow(22f)
+    private val _arabicFontSize = MutableStateFlow(19.5f)
     val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
 
     private val _isAutoFontScaling = MutableStateFlow(prefs.getBoolean("auto_font_scaling", true))
@@ -151,13 +170,61 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     val currentAyahRepeatCount: StateFlow<Int> = _currentAyahRepeatCount.asStateFlow()
 
     val dhikrPresets = listOf(
-        DhikrPreset("صَلَوَات", "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَ آلِ مُحَمَّد", 100),
-        DhikrPreset("تسبیحات حضرت زهرا (س)", "الله اکبر (۳۴) - الحمد لله (۳۳) - سبحان الله (۳۳)", 100),
-        DhikrPreset("سُبْحَانَ اللَّهِ", "پاک و منزه است خداوند", 33),
-        DhikrPreset("الْحَمْدُ لِلَّهِ", "ستایش و سپاس مخصوص خداست", 33),
-        DhikrPreset("لَا إِلٰهَ إِلَّا اللَّهُ", "هیچ معبودی جز خدای یگانه نیست", 100),
-        DhikrPreset("أَسْتَغْفِرُ اللَّهَ", "از درگاه الهی طلب آمرزش می‌نمایم", 70),
-        DhikrPreset("لَا حَوْلَ وَ لَا قُوَّةَ إِلَّا بِاللَّهِ", "هیچ نیرو و قدرتی جز به خواست خدا نیست", 100)
+        getTodayDhikrPreset(),
+        DhikrPreset(
+            title = "صَلَوَات",
+            arabicText = "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَ آلِ مُحَمَّد",
+            meaning = "خدایا بر محمد و خاندان پاکش درود فرست",
+            defaultTarget = 100
+        ),
+        DhikrPreset(
+            title = "تسبیحات حضرت زهرا (س)",
+            arabicText = "اللهُ أَكْبَرُ (۳۴) • الْحَمْدُ لِلَّهِ (۳۳) • سُبْحَانَ اللَّهِ (۳۳)",
+            meaning = "تسبیحات بافضیلت صدیقه طاهره فاطمه زهرا سلام‌الله‌علیها",
+            defaultTarget = 100
+        ),
+        DhikrPreset(
+            title = "أَسْتَغْفِرُ اللَّهَ",
+            arabicText = "أَسْتَغْفِرُ اللَّهَ رَبِّي وَ أَتُوبُ إِلَيْهِ",
+            meaning = "از درگاه الهی طلب آمرزش می‌نمایم و به سویش بازمی‌گردم",
+            defaultTarget = 70
+        ),
+        DhikrPreset(
+            title = "ذکر یونسیه",
+            arabicText = "لَا إِلٰهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ",
+            meaning = "هیچ معبودی جز تو نیست، منزهی تو، همانا من از ستمکاران بودم",
+            defaultTarget = 100
+        ),
+        DhikrPreset(
+            title = "سُبْحَانَ اللَّهِ",
+            arabicText = "سُبْحَانَ اللَّهِ وَ بِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ",
+            meaning = "پاک و منزه است خداوند بلندمرتبه و سپاس و ستایش او راست",
+            defaultTarget = 33
+        ),
+        DhikrPreset(
+            title = "الْحَمْدُ لِلَّهِ",
+            arabicText = "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ عَلَى كُلِّ حَالٍ",
+            meaning = "ستایش و سپاس در همه احوال مخصوص خدای یگانه است",
+            defaultTarget = 33
+        ),
+        DhikrPreset(
+            title = "اللهُ أَكْبَرُ",
+            arabicText = "اللهُ أَكْبَرُ كَبِيرًا وَ الْحَمْدُ لِلَّهِ كَثِيرًا",
+            meaning = "خداوند بزرگ‌تر از آن است که در اندیشه و وصف درآید",
+            defaultTarget = 34
+        ),
+        DhikrPreset(
+            title = "لَا إِلٰهَ إِلَّا اللَّهُ",
+            arabicText = "لَا إِلٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ",
+            meaning = "هیچ معبودی جز خدای یگانه نیست، یکتا و بی‌شریک است",
+            defaultTarget = 100
+        ),
+        DhikrPreset(
+            title = "لَا حَوْلَ وَ لَا قُوَّةَ إِلَّا بِاللَّهِ",
+            arabicText = "لَا حَوْلَ وَ لَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ",
+            meaning = "هیچ نیرو و توانی جز به اراده و خواست خداوند برتر و بزرگ نیست",
+            defaultTarget = 100
+        )
     )
 
     private val _selectedDhikrPreset = MutableStateFlow(dhikrPresets[0])
@@ -168,6 +235,10 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _dhikrTarget = MutableStateFlow(dhikrPresets[0].defaultTarget)
     val dhikrTarget: StateFlow<Int> = _dhikrTarget.asStateFlow()
+
+    // Scroll state preservation for Surah list
+    var surahListScrollIndex: Int = 0
+    var surahListScrollOffset: Int = 0
 
     // Filtered surahs flow
     val filteredSurahs: StateFlow<List<Surah>> = combine(
@@ -551,28 +622,11 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
     fun incrementDhikr() {
         val currentMax = _dhikrTarget.value
         if (_dhikrCount.value >= currentMax) return
-        val next = (_dhikrCount.value + 1).coerceAtMost(currentMax)
-        _dhikrCount.value = next
-
-        if (_dhikrMode.value == DhikrMode.QURAN_VERSES) {
-            val ayahs = _dhikrAyahs.value
-            if (ayahs.isNotEmpty()) {
-                val nextRepeat = _currentAyahRepeatCount.value + 1
-                if (nextRepeat >= _verseRepeatTarget.value) {
-                    _currentAyahRepeatCount.value = 0
-                    // Advance to next verse sequentially (Ayah 1 -> Ayah 2 -> Ayah 3...)
-                    _dhikrAyahIndex.value = (_dhikrAyahIndex.value + 1) % ayahs.size
-                } else {
-                    _currentAyahRepeatCount.value = nextRepeat
-                }
-            }
-        }
+        _dhikrCount.value = (_dhikrCount.value + 1).coerceAtMost(currentMax)
     }
 
     fun resetDhikr() {
         _dhikrCount.value = 0
-        _dhikrAyahIndex.value = 0
-        _currentAyahRepeatCount.value = 0
     }
 
     fun selectDhikrPreset(preset: DhikrPreset) {

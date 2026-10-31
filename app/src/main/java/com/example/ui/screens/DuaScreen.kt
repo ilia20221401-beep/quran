@@ -145,13 +145,14 @@ fun DuaScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
                     Text(
                         text = kursi.arabic,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 21.sp,
-                            lineHeight = 38.sp,
+                            fontSize = (18.5f * scale).sp,
+                            lineHeight = (32f * scale).sp,
                             color = MaterialTheme.colorScheme.primary
                         ),
                         textAlign = TextAlign.Right
@@ -284,13 +285,14 @@ fun DuaScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
                     Text(
                         text = dua.arabic,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 19.sp,
-                            lineHeight = 34.sp,
+                            fontSize = (17f * scale).sp,
+                            lineHeight = (30f * scale).sp,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         textAlign = TextAlign.Right
@@ -301,8 +303,6 @@ fun DuaScreen(
                     Text(
                         text = dua.persian,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            lineHeight = 22.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         textAlign = TextAlign.Right

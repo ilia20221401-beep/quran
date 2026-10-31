@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
@@ -22,16 +24,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AudioPlayerDialog
 import com.example.ui.components.FullQuranSearchDialog
@@ -56,7 +64,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            QuranAppTheme {
+            val isAutoFontScaling by viewModel.isAutoFontScaling.collectAsStateWithLifecycle()
+            QuranAppTheme(autoScaling = isAutoFontScaling) {
                 // Apply Right-To-Left layout direction
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     QuranAppMain(viewModel = viewModel)
@@ -95,11 +104,27 @@ fun QuranAppMain(viewModel: QuranViewModel) {
     val dhikrCount by viewModel.dhikrCount.collectAsStateWithLifecycle()
     val dhikrTarget by viewModel.dhikrTarget.collectAsStateWithLifecycle()
     val selectedDhikrPreset by viewModel.selectedDhikrPreset.collectAsStateWithLifecycle()
-    val dhikrMode by viewModel.dhikrMode.collectAsStateWithLifecycle()
-    val dhikrSurah by viewModel.dhikrSurah.collectAsStateWithLifecycle()
-    val dhikrAyahs by viewModel.dhikrAyahs.collectAsStateWithLifecycle()
-    val dhikrAyahIndex by viewModel.dhikrAyahIndex.collectAsStateWithLifecycle()
-    val verseRepeatTarget by viewModel.verseRepeatTarget.collectAsStateWithLifecycle()
+
+    // Preserved LazyListState for SurahListScreen
+    val surahListState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState(
+            firstVisibleItemIndex = viewModel.surahListScrollIndex,
+            firstVisibleItemScrollOffset = viewModel.surahListScrollOffset
+        )
+    }
+
+    LaunchedEffect(surahListState) {
+        snapshotFlow {
+            surahListState.firstVisibleItemIndex to surahListState.firstVisibleItemScrollOffset
+        }.collect { (index, offset) ->
+            viewModel.surahListScrollIndex = index
+            viewModel.surahListScrollOffset = offset
+        }
+    }
+
+    val favoritesListState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -254,11 +279,18 @@ fun QuranAppMain(viewModel: QuranViewModel) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            when (currentTab) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 760.dp)
+            ) {
+                when (currentTab) {
                 QuranTab.SURAHS -> {
                     SurahListScreen(
+                        listState = surahListState,
                         surahs = filteredSurahs,
                         lastReadSurah = lastReadSurah,
                         searchQuery = searchQuery,
@@ -345,6 +377,7 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
                 QuranTab.FAVORITES -> {
                     FavoritesScreen(
+                        listState = favoritesListState,
                         favoriteIds = favoriteIds,
                         playerState = playerState,
                         cachedSurahNumbers = cachedSurahNumbers,
@@ -359,22 +392,12 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
                 QuranTab.TASBIH -> {
                     DhikrCounterScreen(
-                        dhikrMode = dhikrMode,
-                        currentSurah = dhikrSurah,
-                        ayahs = dhikrAyahs,
-                        currentAyahIndex = dhikrAyahIndex,
-                        verseRepeatTarget = verseRepeatTarget,
                         presets = viewModel.dhikrPresets,
                         selectedPreset = selectedDhikrPreset,
                         count = dhikrCount,
                         target = dhikrTarget,
                         onIncrement = { viewModel.incrementDhikr() },
                         onReset = { viewModel.resetDhikr() },
-                        onNextAyah = { viewModel.nextDhikrAyah() },
-                        onPrevAyah = { viewModel.prevDhikrAyah() },
-                        onSelectSurah = { viewModel.selectDhikrSurah(it) },
-                        onSetRepeatTarget = { viewModel.setVerseRepeatTarget(it) },
-                        onSetDhikrMode = { viewModel.setDhikrMode(it) },
                         onSelectPreset = { viewModel.selectDhikrPreset(it) },
                         onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
                     )
@@ -394,9 +417,12 @@ fun QuranAppMain(viewModel: QuranViewModel) {
 
                 QuranTab.ABOUT -> {
                     AboutScreen(
-                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) }
+                        onBack = { viewModel.navigateTo(QuranTab.SURAHS) },
+                        isAutoFontScaling = isAutoFontScaling,
+                        onToggleAutoFontScaling = { viewModel.toggleAutoFontScaling() }
                     )
                 }
+            }
             }
         }
     }

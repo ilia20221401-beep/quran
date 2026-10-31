@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
@@ -41,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -56,6 +58,8 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
+    isAutoFontScaling: Boolean = true,
+    onToggleAutoFontScaling: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -164,6 +168,70 @@ fun AboutScreen(
             }
         }
 
+        // Global Auto Scaling Settings Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("about_auto_scaling_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "تنظیم خودکار مقیاس (Auto Scaling)",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isAutoFontScaling) "فعال • اندازه متون و قلم تمام صفحات با صفحه نمایش شما تطبیق می‌یابد" else "غیرفعال • مقیاس استاندارد بر تمام صفحات اعمال شده است",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = isAutoFontScaling,
+                        onCheckedChange = { onToggleAutoFontScaling() }
+                    )
+                }
+            }
+        }
+
         // Designer / Developer Credit Card (Main User Request)
         item {
             Card(
@@ -253,7 +321,7 @@ fun AboutScreen(
                         "ترجمه روان و شیوای فارسی برای تمامی آیات",
                         "تلاوت صوتی آیات با صدای قاریان برجسته جهان اسلام",
                         "امکان دانلود سوره‌ها و پخش کاملاً آفلاین",
-                        "ذکرشمار هوشمند با قابلیت تکرار آیات و ذکرهای روزانه",
+                        "ذکرشمار و تسبیحات هوشمند همراه با اذکار ایام هفته و تسبیحات حضرت زهرا (س)",
                         "بخش ادعیه و مناجات‌های قرآنی همراه با ترجمه",
                         "نشانه‌گذاری و ذخیره سوره‌های مورد علاقه"
                     )

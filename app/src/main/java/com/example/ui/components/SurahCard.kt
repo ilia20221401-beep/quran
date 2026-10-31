@@ -125,6 +125,7 @@ fun SurahCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
+                val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -134,7 +135,7 @@ fun SurahCard(
                         text = "سوره ${surah.namePersian}",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
+                            fontSize = (15f * scale).sp,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         maxLines = 1,
@@ -147,7 +148,7 @@ fun SurahCard(
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = QuranAmiriFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 19.sp,
+                            fontSize = (16.5f * scale).sp,
                             color = MaterialTheme.colorScheme.primary
                         ),
                         textAlign = TextAlign.End

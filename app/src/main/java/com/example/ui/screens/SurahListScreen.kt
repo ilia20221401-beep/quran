@@ -16,9 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -89,6 +92,7 @@ fun SurahListScreen(
     cachedSurahNumbers: Set<Int> = emptySet(),
     downloadProgress: Map<Int, Float> = emptyMap(),
     dailyAyah: DailyAyah? = null,
+    listState: LazyListState = rememberLazyListState(),
     onOpenDailyAyah: (Int, Int) -> Unit = { _, _ -> },
     onOpenPrayerTimes: () -> Unit = {},
     onOpenDhikr: () -> Unit = {},
@@ -105,9 +109,10 @@ fun SurahListScreen(
     onSelectReciter: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedListTab by remember { mutableIntStateOf(0) } // 0: Surahs, 1: Juz
+    var selectedListTab by rememberSaveable { mutableIntStateOf(0) } // 0: Surahs, 1: Juz
 
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .testTag("surah_list_screen"),
@@ -167,7 +172,7 @@ fun SurahListScreen(
                                 text = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
+                                    fontSize = 15.5.sp,
                                     color = Color.White
                                 )
                             )

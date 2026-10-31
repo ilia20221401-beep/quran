@@ -199,13 +199,14 @@ private fun AsmaCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
             Text(
                 text = name.arabic,
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontFamily = QuranAmiriFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    lineHeight = 32.sp,
+                    fontSize = (18f * scale).sp,
+                    lineHeight = (26f * scale).sp,
                     color = MaterialTheme.colorScheme.primary
                 ),
                 textAlign = TextAlign.Center
@@ -246,13 +247,14 @@ private fun AsmaDetailDialog(
                     )
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
                 Text(
                     text = name.arabic,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontFamily = QuranAmiriFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 30.sp,
-                        lineHeight = 44.sp,
+                        fontSize = (24f * scale).sp,
+                        lineHeight = (34f * scale).sp,
                         color = MaterialTheme.colorScheme.primary
                     ),
                     textAlign = TextAlign.Center

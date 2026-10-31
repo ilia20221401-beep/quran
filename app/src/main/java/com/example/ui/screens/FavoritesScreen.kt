@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
@@ -48,6 +50,7 @@ fun FavoritesScreen(
     onPlaySurah: (Surah) -> Unit,
     onToggleFavorite: (Int) -> Unit,
     onDownloadSurah: (Surah) -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -57,6 +60,7 @@ fun FavoritesScreen(
         .sortedBy { it.number }
 
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .testTag("favorites_screen"),

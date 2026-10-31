@@ -9,8 +9,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,10 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Card
@@ -50,8 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -65,32 +58,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.Ayah
-import com.example.data.model.Surah
-import com.example.data.model.SurahDatabase
 import com.example.ui.theme.QuranAmiriFontFamily
 import com.example.ui.theme.VazirmatnFontFamily
-import com.example.ui.viewmodel.DhikrMode
 import com.example.ui.viewmodel.DhikrPreset
 
 @Composable
 fun DhikrCounterScreen(
-    dhikrMode: DhikrMode,
-    currentSurah: Surah,
-    ayahs: List<Ayah>,
-    currentAyahIndex: Int,
-    verseRepeatTarget: Int,
     presets: List<DhikrPreset>,
     selectedPreset: DhikrPreset,
     count: Int,
     target: Int,
     onIncrement: () -> Unit,
     onReset: () -> Unit,
-    onNextAyah: () -> Unit,
-    onPrevAyah: () -> Unit,
-    onSelectSurah: (Surah) -> Unit,
-    onSetRepeatTarget: (Int) -> Unit,
-    onSetDhikrMode: (DhikrMode) -> Unit,
     onSelectPreset: (DhikrPreset) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -116,28 +95,14 @@ fun DhikrCounterScreen(
                     vibrator?.vibrate(35)
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore if vibration unavailable
         }
     }
 
-    // Dynamic counter target based on selected Dhikr preset or mode
     val maxCount = target
     val progress = if (maxCount > 0) (count.toFloat() / maxCount.toFloat()).coerceIn(0f, 1f) else 0f
     val isMaxReached = count >= maxCount
-
-    // Key popular surahs for Dhikr
-    val quickDhikrSurahs = remember {
-        listOf(
-            SurahDatabase.getSurah(1)!!,   // حمد
-            SurahDatabase.getSurah(112)!!, // اخلاص / توحید
-            SurahDatabase.getSurah(97)!!,  // قدر
-            SurahDatabase.getSurah(108)!!, // کوثر
-            SurahDatabase.getSurah(103)!!, // عصر
-            SurahDatabase.getSurah(113)!!, // فلق
-            SurahDatabase.getSurah(114)!!  // ناس
-        )
-    }
 
     Column(
         modifier = modifier
@@ -147,343 +112,228 @@ fun DhikrCounterScreen(
             .testTag("dhikr_counter_screen"),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Mode Selector TabRow (Quran Verses vs General Dhikr)
-        TabRow(
-            selectedTabIndex = if (dhikrMode == DhikrMode.QURAN_VERSES) 0 else 1,
+        // Top Header
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp)),
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.primary
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Tab(
-                selected = dhikrMode == DhikrMode.QURAN_VERSES,
-                onClick = { onSetDhikrMode(DhikrMode.QURAN_VERSES) },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AutoStories,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "آیات قرآن (آیه به آیه)",
-                            fontWeight = if (dhikrMode == DhikrMode.QURAN_VERSES) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.testTag("dhikr_back_button")
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "بازگشت",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Default.TouchApp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
             )
-            Tab(
-                selected = dhikrMode == DhikrMode.GENERAL_DHIKR,
-                onClick = { onSetDhikrMode(DhikrMode.GENERAL_DHIKR) },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.TouchApp,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "اذکار و صلوات",
-                            fontWeight = if (dhikrMode == DhikrMode.GENERAL_DHIKR) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = "ذکرشمار و تسبیحات",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = VazirmatnFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Text(
+                    text = "تسبیحات حضرت زهرا (س)، صلوات و اذکار شریف",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = VazirmatnFontFamily,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
+        }
+
+        // Horizontal Dhikr Presets Carousel
+        Text(
+            text = "انتخاب ذکر یا تسبیح:",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontFamily = VazirmatnFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        )
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            items(presets, key = { it.title }) { preset ->
+                val isSelected = preset.title == selectedPreset.title
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelectPreset(preset) },
+                    label = {
+                        Text(
+                            text = "${preset.title} (${preset.defaultTarget})",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = VazirmatnFontFamily,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.testTag("dhikr_preset_${preset.title}")
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        if (dhikrMode == DhikrMode.QURAN_VERSES) {
-            // Surah Selector Chips Row
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
-            ) {
-                items(quickDhikrSurahs) { surah ->
-                    val isSelected = surah.number == currentSurah.number
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onSelectSurah(surah) },
-                        label = {
-                            Text(
-                                text = "سوره ${surah.namePersian}",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        modifier = Modifier.testTag("dhikr_surah_${surah.number}")
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Active Verse Card (Sequential Ayah Display)
-            val currentAyah = ayahs.getOrNull(currentAyahIndex)
-            Card(
+        // Active Dhikr Calligraphy Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("active_dhikr_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("active_verse_card"),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Header: Navigation Arrows & Verse Index
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onPrevAyah,
-                            enabled = ayahs.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "آیه قبلی",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = if (currentAyah != null) {
-                                    "سوره ${currentSurah.namePersian} • آیه ${currentAyah.numberInSurah} از ${ayahs.size}"
-                                } else {
-                                    "سوره ${currentSurah.namePersian}"
-                                },
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                ),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onNextAyah,
-                            enabled = ayahs.isNotEmpty()
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "آیه بعدی",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                // Special Hazrat Zahra (sa) 3-phase indicator
+                if (selectedPreset.title.contains("حضرت زهرا")) {
+                    val currentPhase = when {
+                        count < 34 -> 1
+                        count in 34..66 -> 2
+                        count in 67..99 -> 3
+                        else -> 4
+                    }
+                    val phaseText = when (currentPhase) {
+                        1 -> "مرحله ۱ از ۳: ۳۴ مرتبه «اللهُ أَكْبَرُ»"
+                        2 -> "مرحله ۲ از ۳: ۳۳ مرتبه «الْحَمْدُ لِلَّهِ»"
+                        3 -> "مرحله ۳ از ۳: ۳۳ مرتبه «سُبْحَانَ اللَّهِ»"
+                        else -> "تسبیحات با ۱۰۰ ذکر با موفقیت پایان یافت"
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Animated Verse Content
-                    AnimatedContent(
-                        targetState = currentAyah,
-                        transitionSpec = {
-                            (slideInHorizontally { width -> width / 3 } + fadeIn()).togetherWith(
-                                slideOutHorizontally { width -> -width / 3 } + fadeOut()
-                            )
-                        },
-                        label = "ayah_display_animation"
-                    ) { targetAyah ->
-                        if (targetAyah != null) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = targetAyah.textArabic,
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontFamily = QuranAmiriFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 22.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 40.sp
-                                    ),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Text(
-                                    text = targetAyah.textPersian,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 13.5.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        lineHeight = 22.sp
-                                    ),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = "در حال بارگذاری متن آیه...",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Repetition target per verse selector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                        modifier = Modifier.padding(bottom = 12.dp)
                     ) {
                         Text(
-                            text = "جابجایی آیه بعد از:",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            text = phaseText,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = VazirmatnFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        listOf(1, 3, 7, 10).forEach { rTarget ->
-                            val isSelected = verseRepeatTarget == rTarget
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .clickable { onSetRepeatTarget(rTarget) }
-                            ) {
-                                Text(
-                                    text = "$rTarget بار",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
                     }
                 }
-            }
-        } else {
-            // General Dhikr Presets LazyRow
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
-            ) {
-                items(presets) { preset ->
-                    val isSelected = preset.title == selectedPreset.title
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onSelectPreset(preset) },
-                        label = {
-                            Text(
-                                text = "${preset.title} (${preset.defaultTarget})",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        modifier = Modifier.testTag("dhikr_preset_${preset.title}")
-                    )
+
+                // Arabic Calligraphy Text
+                AnimatedContent(
+                    targetState = selectedPreset,
+                    transitionSpec = {
+                        fadeIn().togetherWith(fadeOut())
+                    },
+                    label = "dhikr_text_animation"
+                ) { preset ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val scale = com.example.ui.theme.LocalResponsiveScaleFactor.current
+                        Text(
+                            text = preset.arabicText,
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontFamily = QuranAmiriFontFamily,
+                                fontSize = (20f * scale).sp,
+                                lineHeight = (34f * scale).sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = preset.meaning,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = VazirmatnFontFamily,
+                                fontSize = 13.5.sp,
+                                lineHeight = 22.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // Active General Dhikr Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(top = 2.dp)
                 ) {
-                    // Dynamic Hazrat Zahra (sa) phase guidance
-                    if (selectedPreset.title.contains("حضرت زهرا")) {
-                        val phaseTitle = when {
-                            count < 34 -> "مرحله اول: ۳۴ مرتبه «اللهُ أَكْبَرُ»"
-                            count in 34..66 -> "مرحله دوم: ۳۳ مرتبه «الْحَمْدُ لِلَّهِ»"
-                            count in 67..99 -> "مرحله سوم: ۳۳ مرتبه «سُبْحَانَ اللَّهِ»"
-                            else -> "تسبیحات با ۱۰۰ ذکر به پایان رسید"
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Text(
-                                text = phaseTitle,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                ),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = selectedPreset.title,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
                         )
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = selectedPreset.meaning,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 22.sp
-                        ),
-                        textAlign = TextAlign.Center
-                    )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "سقف معین این ذکر: ${selectedPreset.defaultTarget} مرتبه",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = VazirmatnFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Target Status Banner
+        // Target Status Banner (when completed)
         if (isMaxReached) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.tertiaryContainer,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 14.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
@@ -491,12 +341,13 @@ fun DhikrCounterScreen(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "به سقف $maxCount ذکر رسید • برای شروع دور جدید دکمه صفر کردن را بزنید",
+                        text = "سقف $maxCount ذکر تکمیل شد • برای شروع دور جدید دکمه صفر کردن را بزنید",
                         style = MaterialTheme.typography.labelMedium.copy(
+                            fontFamily = VazirmatnFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -505,10 +356,14 @@ fun DhikrCounterScreen(
             }
         }
 
-        // Big Circular Counter Button
+        val scaleFactor = com.example.ui.theme.LocalResponsiveScaleFactor.current
+        val buttonOuterSize = (210f * scaleFactor.coerceIn(0.85f, 1.15f)).dp
+        val buttonInnerSize = (175f * scaleFactor.coerceIn(0.85f, 1.15f)).dp
+
+        // Big Circular Dhikr Touch Button
         Box(
             modifier = Modifier
-                .size(240.dp)
+                .size(buttonOuterSize)
                 .testTag("dhikr_tap_area")
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -523,15 +378,15 @@ fun DhikrCounterScreen(
             CircularProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxSize(),
-                strokeWidth = 12.dp,
-                color = if (isMaxReached) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
+                strokeWidth = (12f * scaleFactor.coerceIn(0.85f, 1.2f)).dp,
+                color = if (isMaxReached) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
             // Inner circle button
             Surface(
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(buttonInnerSize)
                     .clip(CircleShape),
                 color = if (isMaxReached) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 tonalElevation = 6.dp,
@@ -561,16 +416,18 @@ fun DhikrCounterScreen(
                         Text(
                             text = "$count",
                             style = MaterialTheme.typography.displayMedium.copy(
+                                fontFamily = VazirmatnFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimary,
-                                fontSize = 54.sp
+                                fontSize = (44f * scaleFactor).sp
                             )
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (isMaxReached) "تکمیل ($count / $maxCount)" else "از $maxCount",
+                            text = if (isMaxReached) "تکمیل ($count / $maxCount)" else "از سقف $maxCount",
                             style = MaterialTheme.typography.titleSmall.copy(
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                                fontFamily = VazirmatnFontFamily,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
                                 fontWeight = FontWeight.SemiBold
                             )
                         )
@@ -584,8 +441,9 @@ fun DhikrCounterScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isMaxReached) "سقف $maxCount تکمیل" else "لمس برای ذکر بعدی",
+                                text = if (isMaxReached) "تکمیل شد" else "لمس برای ذکر بعدی",
                                 style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = VazirmatnFontFamily,
                                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                                 )
                             )
@@ -597,41 +455,37 @@ fun DhikrCounterScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Reset and Ayah Navigation Controls
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+        // Reset and Action Controls
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .clickable { onReset() }
+                .testTag("dhikr_reset_button")
         ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier
-                    .clickable { onReset() }
-                    .testTag("dhikr_reset_button")
+            Row(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "صفر کردن شمارنده",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "صفر کردن شمارنده",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "شروع مجدد (صفر کردن شمارنده)",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontFamily = VazirmatnFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "شروع مجدد (صفر کردن شمارنده)",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(90.dp))
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }

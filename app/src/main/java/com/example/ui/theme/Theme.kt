@@ -8,7 +8,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -57,8 +60,26 @@ private val LightColorScheme = lightColorScheme(
 fun QuranAppTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   dynamicColor: Boolean = false, // Keep distinct Islamic emerald-gold branding consistent
+  autoScaling: Boolean = true,
   content: @Composable () -> Unit,
 ) {
+  val configuration = LocalConfiguration.current
+  val screenWidthDp = configuration.screenWidthDp
+
+  val scaleFactor = remember(autoScaling, screenWidthDp) {
+    if (autoScaling) {
+      when {
+        screenWidthDp < 360 -> 0.85f
+        screenWidthDp < 400 -> 0.92f
+        screenWidthDp < 600 -> 0.98f
+        screenWidthDp < 840 -> 1.04f
+        else -> 1.08f
+      }
+    } else {
+      1.0f
+    }
+  }
+
   val colorScheme = when {
     dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
       val context = LocalContext.current
@@ -68,9 +89,18 @@ fun QuranAppTheme(
     else -> LightColorScheme
   }
 
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = Typography,
-    content = content
-  )
+  val responsiveTypography = remember(scaleFactor) {
+    getResponsiveTypography(scaleFactor)
+  }
+
+  CompositionLocalProvider(
+    LocalAutoScalingEnabled provides autoScaling,
+    LocalResponsiveScaleFactor provides scaleFactor
+  ) {
+    MaterialTheme(
+      colorScheme = colorScheme,
+      typography = responsiveTypography,
+      content = content
+    )
+  }
 }
